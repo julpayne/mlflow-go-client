@@ -30,4 +30,4 @@ Thumbs.db
 
 # MLflow files
 mlruns/
-# *.db
+*.db

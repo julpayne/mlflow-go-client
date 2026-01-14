@@ -8,12 +8,10 @@ import (
 
 	"github.com/cucumber/godog"
 	"github.com/julpayne/mlflow-go-client"
-	"github.com/julpayne/mlflow-go-client/testutil"
 )
 
 type testContext struct {
 	client           *mlflow.Client
-	server           *testutil.MLflowServer
 	experimentID     string
 	experimentName   string
 	runID            string
@@ -196,22 +194,13 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 // Server setup steps
 func (tc *testContext) serverIsRunning(url string) error {
-	// For testing, we'll use an existing server if MLFLOW_TEST_URL is set
-	// Otherwise, we'll start our own test server
+	// For testing, we'll use an existing server if MLFLOW_TEST_URL
 	testURL := os.Getenv("MLFLOW_TEST_URL")
 	if testURL != "" {
 		tc.client = mlflow.NewClient(testURL)
 		return nil
 	}
-
-	// Start test server
-	tc.server = testutil.NewMLflowServer()
-	ctx := context.Background()
-	if err := tc.server.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start test server: %w", err)
-	}
-	tc.client = mlflow.NewClient(tc.server.BaseURL)
-	return nil
+	return fmt.Errorf("MLFLOW_TEST_URL is not set")
 }
 
 func (tc *testContext) clientConnected() error {
@@ -536,10 +525,10 @@ func (tc *testContext) logMetric(key string, value float64) error {
 		return fmt.Errorf("no run ID set")
 	}
 	req := mlflow.LogMetricRequest{
-		RunID:  tc.runID,
-		Key:    key,
-		Value:  value,
-		Step:   1,
+		RunID:     tc.runID,
+		Key:       key,
+		Value:     value,
+		Step:      1,
 		Timestamp: time.Now().UnixMilli(),
 	}
 	return tc.client.LogMetric(req)

@@ -128,7 +128,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json \
 ### Port Already in Use
 If port 5000 is already in use, specify a different port:
 ```bash
-MLFLOW_PORT=5001 ./scripts/run_mlflow.sh
+MLFLOW_PORT=5000 ./scripts/run_mlflow.sh
 ```
 
 ### Permission Denied

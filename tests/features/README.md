@@ -41,7 +41,7 @@ make test-godog
 
 **Option 2: Automatic test server management**
 ```bash
-# This will start a test server on port 5001 automatically
+# This will start a test server on port 5000 automatically
 make test-godog-server
 ```
 
@@ -57,7 +57,7 @@ You can configure the tests using environment variables:
 
 - `MLFLOW_TEST_URL` - URL of existing MLflow server (e.g., `http://localhost:5000`)
 - `MLFLOW_TEST_HOST` - Host for test server (default: `127.0.0.1`)
-- `MLFLOW_TEST_PORT` - Port for test server (default: `5001`)
+- `MLFLOW_TEST_PORT` - Port for test server (default: `5000`)
 - `MLFLOW_TEST_BACKEND_STORE_URI` - Backend store URI for test server
 - `MLFLOW_TEST_ARTIFACT_ROOT` - Artifact root for test server
 

@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Default values
 HOST=${MLFLOW_HOST:-"127.0.0.1"}
-PORT=${MLFLOW_PORT:-"5001"}
+PORT=${MLFLOW_PORT:-"5000"}
 BACKEND_URI=${MLFLOW_BACKEND_STORE_URI:-"sqlite:///mlflow.db"}
 DEFAULT_ARTIFACT_ROOT=${MLFLOW_DEFAULT_ARTIFACT_ROOT:-"./mlruns"}
 

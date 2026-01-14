@@ -5,7 +5,7 @@
 
 # Variables
 MLFLOW_HOST ?= 127.0.0.1
-MLFLOW_PORT ?= 5001
+MLFLOW_PORT ?= 5000
 MLFLOW_BACKEND_STORE_URI ?= sqlite:///mlflow.db
 MLFLOW_DEFAULT_ARTIFACT_ROOT ?= ./mlruns
 
@@ -96,10 +96,13 @@ test-godog:
 	@echo "   Make sure MLflow server is running or set MLFLOW_TEST_URL"
 	@cd tests/features && go test -v -tags=godog
 
+MLFLOW_TEST_URL ?= http://$(MLFLOW_HOST):$(MLFLOW_PORT)
+
 ## test-godog-server: Run godog tests with automatic server management
 test-godog-server: run-mlflow ; $(info The MLflow server was successfully started)
 	@echo "🧪 Running godog BDD tests with test server..."
-	@cd tests/features && MLFLOW_TEST_PORT=5001 go test -v -tags=godog
+	@rm -f mlflow.db tests/features/test_mlflow_${MLFLOW_PORT}.db
+	@cd tests/features && MLFLOW_TEST_URL=${MLFLOW_TEST_URL} go test -v -tags=godog
 	@make stop-mlflow
 
 ## fmt: Format Go code

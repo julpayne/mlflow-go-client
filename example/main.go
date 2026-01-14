@@ -49,10 +49,10 @@ func main() {
 	fmt.Println("\nLogging metrics...")
 	for i := 0; i < 5; i++ {
 		err := client.LogMetric(mlflow.LogMetricRequest{
-			RunID:  runID,
-			Key:    "accuracy",
-			Value:  0.9 + float64(i)*0.01,
-			Step:   int64(i),
+			RunID:     runID,
+			Key:       "accuracy",
+			Value:     0.9 + float64(i)*0.01,
+			Step:      int64(i),
 			Timestamp: time.Now().UnixMilli(),
 		})
 		if err != nil {
@@ -60,10 +60,10 @@ func main() {
 		}
 
 		err = client.LogMetric(mlflow.LogMetricRequest{
-			RunID:  runID,
-			Key:    "loss",
-			Value:  0.1 - float64(i)*0.01,
-			Step:   int64(i),
+			RunID:     runID,
+			Key:       "loss",
+			Value:     0.1 - float64(i)*0.01,
+			Step:      int64(i),
 			Timestamp: time.Now().UnixMilli(),
 		})
 		if err != nil {
