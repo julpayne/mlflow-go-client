@@ -1,4 +1,4 @@
-.PHONY: help install-mlflow run-mlflow stop-mlflow deps build test clean fmt vet lint example
+.PHONY: help autoupdate-precommit pre-commitinstall-mlflow run-mlflow stop-mlflow deps build test clean fmt vet lint example
 
 # Default target
 .DEFAULT_GOAL := help
@@ -11,21 +11,32 @@ MLFLOW_DEFAULT_ARTIFACT_ROOT ?= ./mlruns
 
 ## help: Show this help message
 help:
-	@echo "Available targets:"
+	@echo "MLflow Go Client - Available targets:"
 	@echo ""
+	@echo "MLflow Server:"
 	@echo "  make install-mlflow    - Download and install MLflow server"
-	@echo "  make run-mlflow         - Run MLflow server locally"
+	@echo "  make run-mlflow         - Run MLflow server locally (in background)"
 	@echo "  make stop-mlflow        - Stop MLflow server (if running)"
+	@echo ""
+	@echo "Development:"
 	@echo "  make deps               - Download all Go dependencies"
 	@echo "  make build              - Build the Go client library"
-	@echo "  make test               - Run tests"
-	@echo "  make test-godog         - Run godog BDD tests (requires MLflow server)"
-	@echo "  make test-godog-server  - Run godog BDD tests with automatic server"
 	@echo "  make fmt                - Format Go code"
 	@echo "  make vet                - Run go vet"
 	@echo "  make lint               - Run golangci-lint (if installed)"
+	@echo ""
+	@echo "Testing:"
+	@echo "  make test               - Run all Go tests"
+	@echo "  make test-godog         - Run godog BDD tests (requires MLflow server)"
+	@echo "  make test-godog-server  - Run godog BDD tests with automatic server"
+	@echo ""
+	@echo "Examples:"
 	@echo "  make example            - Build and run the example"
-	@echo "  make clean              - Clean build artifacts"
+	@echo ""
+	@echo "Utilities:"
+	@echo "  make clean              - Clean build artifacts and test files"
+	@echo "  make pre-commit         - Install/update pre-commit hooks"
+	@echo "  make help               - Show this help message"
 	@echo ""
 	@echo "MLflow server configuration (use as environment variables):"
 	@echo "  MLFLOW_HOST                    - Server host (default: 127.0.0.1)"
@@ -33,10 +44,21 @@ help:
 	@echo "  MLFLOW_BACKEND_STORE_URI       - Backend store URI (default: sqlite:///mlflow.db)"
 	@echo "  MLFLOW_DEFAULT_ARTIFACT_ROOT    - Artifact root (default: ./mlruns)"
 	@echo ""
-	@echo "Examples:"
-	@echo "  make install-mlflow"
-	@echo "  make run-mlflow"
-	@echo "  MLFLOW_PORT=8080 make run-mlflow"
+	@echo "Quick Start Examples:"
+	@echo "  make install-mlflow            # Install MLflow"
+	@echo "  make run-mlflow                 # Start server"
+	@echo "  make test-godog                 # Run BDD tests"
+	@echo "  MLFLOW_PORT=8080 make run-mlflow # Custom port"
+
+PRE_COMMIT ?= .git/hooks/pre-commit
+
+${PRE_COMMIT}: .pre-commit-config.yaml
+	pre-commit install
+
+autoupdate-precommit:
+	pre-commit autoupdate
+
+pre-commit: autoupdate-precommit ${PRE_COMMIT}
 
 ## install-mlflow: Download and install MLflow server
 install-mlflow:
