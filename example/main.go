@@ -124,11 +124,14 @@ func main() {
 	}
 	fmt.Printf("Run updated. Status: %s\n", updateResp.RunInfo.Status)
 
-	// Example 8: List experiments
+	// Example 8: List experiments (using SearchExperiments)
 	fmt.Println("\nListing experiments...")
-	experiments, err := client.ListExperiments(10, "")
+	expSearchReq := mlflow.SearchExperimentsRequest{
+		MaxResults: 10,
+	}
+	experiments, err := client.SearchExperiments(expSearchReq)
 	if err != nil {
-		log.Fatalf("Failed to list experiments: %v", err)
+		log.Fatalf("Failed to search experiments: %v", err)
 	}
 	fmt.Printf("Found %d experiments\n", len(experiments.Experiments))
 	for _, exp := range experiments.Experiments {

@@ -32,6 +32,30 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
+func (c *Client) CheckServer() error {
+	minSupportedVersion := "3.8.0"
+
+	// Check that the server is running and has a version that we can handle
+	health, err := c.GetHealth()
+	if err != nil {
+		return fmt.Errorf("failed to get server health: %w", err)
+	}
+	if health != "OK" {
+		return fmt.Errorf("server health is not OK: %s", health)
+	}
+	version, err := c.GetVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get server version: %w", err)
+	}
+	if version == "" {
+		return fmt.Errorf("server version is empty")
+	}
+	if version < minSupportedVersion {
+		return fmt.Errorf("server version %s is not supported, expected %s or higher", version, minSupportedVersion)
+	}
+	return nil
+}
+
 // SetAuthToken sets the authentication token for the client
 func (c *Client) SetAuthToken(token string) {
 	c.AuthToken = token
@@ -95,59 +119,123 @@ func (c *Client) doRequest(method, endpoint string, body interface{}) ([]byte, e
 	return respBody, nil
 }
 
-// Experiments API
-
-// CreateExperiment creates a new experiment
-func (c *Client) CreateExperiment(req CreateExperimentRequest) (*CreateExperimentResponse, error) {
-	endpoint := "/api/2.0/mlflow/experiments/create"
-	respBody, err := c.doRequest("POST", endpoint, req)
-	if err != nil {
-		return nil, err
-	}
-
-	var response CreateExperimentResponse
+// unmarshalResponse unmarshals JSON response body into a struct of type T
+func unmarshalResponse[T any](respBody []byte) (*T, error) {
+	var response T
 	if err := json.Unmarshal(respBody, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
-
 	return &response, nil
 }
 
-// GetExperiment gets an experiment by ID
-func (c *Client) GetExperiment(experimentID string) (*GetExperimentResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/experiments/get?experiment_id=%s", url.QueryEscape(experimentID))
-	respBody, err := c.doRequest("GET", endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
+// API endpoint constants
+const (
+	// Base API path
+	apiBasePath = "/api/2.0/mlflow"
 
-	var response GetExperimentResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
+	// Base URLs for API sections
+	experimentsBaseURL      = apiBasePath + "/experiments"
+	runsBaseURL             = apiBasePath + "/runs"
+	registeredModelsBaseURL = apiBasePath + "/registered-models"
+	modelVersionsBaseURL    = apiBasePath + "/model-versions"
 
-	return &response, nil
+	// Server endpoints
+	endpointHealth  = "/health"
+	endpointVersion = "/version"
+
+	// Experiments endpoints
+	endpointExperimentsCreate        = experimentsBaseURL + "/create"
+	endpointExperimentsGetBase       = experimentsBaseURL + "/get"
+	endpointExperimentsGetByNameBase = experimentsBaseURL + "/get-by-name"
+	endpointExperimentsDeleteBase    = experimentsBaseURL + "/delete"
+	endpointExperimentsRestoreBase   = experimentsBaseURL + "/restore"
+	endpointExperimentsUpdate        = experimentsBaseURL + "/update"
+	endpointExperimentsSetTag        = experimentsBaseURL + "/set-experiment-tag"
+	endpointExperimentsDeleteTag     = experimentsBaseURL + "/delete-experiment-tag"
+	endpointExperimentsSearch        = experimentsBaseURL + "/search"
+
+	// Runs endpoints
+	endpointRunsCreate       = runsBaseURL + "/create"
+	endpointRunsGet          = runsBaseURL + "/get"
+	endpointRunsSearch       = runsBaseURL + "/search"
+	endpointRunsUpdate       = runsBaseURL + "/update"
+	endpointRunsDelete       = runsBaseURL + "/delete"
+	endpointRunsRestore      = runsBaseURL + "/restore"
+	endpointRunsLogMetric    = runsBaseURL + "/log-metric"
+	endpointRunsLogParameter = runsBaseURL + "/log-parameter"
+	endpointRunsSetTag       = runsBaseURL + "/set-tag"
+	endpointRunsDeleteTag    = runsBaseURL + "/delete-tag"
+	endpointRunsLogBatch     = runsBaseURL + "/log-batch"
+	endpointRunsLogModel     = runsBaseURL + "/log-model"
+	endpointRunsLogInputs    = runsBaseURL + "/log-inputs"
+
+	// Metrics endpoints
+	endpointMetricsGetHistoryBase = apiBasePath + "/metrics/get-history"
+
+	// Artifacts endpoints
+	endpointArtifactsListBase = apiBasePath + "/artifacts/list"
+
+	// Registered Models endpoints
+	endpointRegisteredModelsCreate                     = registeredModelsBaseURL + "/create"
+	endpointRegisteredModelsGet                        = registeredModelsBaseURL + "/get"
+	endpointRegisteredModelsList                       = registeredModelsBaseURL + "/list"
+	endpointRegisteredModelsUpdate                     = registeredModelsBaseURL + "/update"
+	endpointRegisteredModelsDelete                     = registeredModelsBaseURL + "/delete"
+	endpointRegisteredModelsRename                     = registeredModelsBaseURL + "/rename"
+	endpointRegisteredModelsGetLatestVersions          = registeredModelsBaseURL + "/get-latest-versions"
+	endpointRegisteredModelsSearch                     = registeredModelsBaseURL + "/search"
+	endpointRegisteredModelsSetTag                     = registeredModelsBaseURL + "/set-tag"
+	endpointRegisteredModelsDeleteTagBase              = registeredModelsBaseURL + "/delete-tag"
+	endpointRegisteredModelsAliasBase                  = registeredModelsBaseURL + "/alias"
+	endpointRegisteredModelsGetModelVersionByAliasBase = registeredModelsBaseURL + "/get-model-version-by-alias"
+
+	// Model Versions endpoints
+	endpointModelVersionsCreate          = modelVersionsBaseURL + "/create"
+	endpointModelVersionsGetBase         = modelVersionsBaseURL + "/get"
+	endpointModelVersionsList            = modelVersionsBaseURL + "/list"
+	endpointModelVersionsUpdate          = modelVersionsBaseURL + "/update"
+	endpointModelVersionsDeleteBase      = modelVersionsBaseURL + "/delete"
+	endpointModelVersionsTransitionStage = modelVersionsBaseURL + "/transition-stage"
+	endpointModelVersionsSearch          = modelVersionsBaseURL + "/search"
+	endpointModelVersionsGetDownloadURIs = modelVersionsBaseURL + "/get-download-uris"
+	endpointModelVersionsSetTag          = modelVersionsBaseURL + "/set-tag"
+	endpointModelVersionsDeleteTagBase   = modelVersionsBaseURL + "/delete-tag"
+)
+
+// Endpoint helper functions for parameterized endpoints
+
+// endpointMetricsGetHistory returns the endpoint for getting metric history with query parameters
+func endpointMetricsGetHistory(runUUID, metricKey string, maxResults int, pageToken string) string {
+	endpoint := fmt.Sprintf("%s?run_uuid=%s&metric_key=%s",
+		endpointMetricsGetHistoryBase, url.QueryEscape(runUUID), url.QueryEscape(metricKey))
+	if maxResults > 0 || pageToken != "" {
+		params := url.Values{}
+		if maxResults > 0 {
+			params.Add("max_results", fmt.Sprintf("%d", maxResults))
+		}
+		if pageToken != "" {
+			params.Add("page_token", pageToken)
+		}
+		endpoint += "&" + params.Encode()
+	}
+	return endpoint
 }
 
-// GetExperimentByName gets an experiment by name
-func (c *Client) GetExperimentByName(experimentName string) (*GetExperimentResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/experiments/get-by-name?experiment_name=%s", url.QueryEscape(experimentName))
-	respBody, err := c.doRequest("GET", endpoint, nil)
-	if err != nil {
-		return nil, err
+// endpointArtifactsList returns the endpoint for listing artifacts with query parameters
+func endpointArtifactsList(runID, path, pageToken string) string {
+	endpoint := fmt.Sprintf("%s?run_id=%s", endpointArtifactsListBase, url.QueryEscape(runID))
+	if path != "" {
+		endpoint += "&path=" + url.QueryEscape(path)
 	}
-
-	var response GetExperimentResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	if pageToken != "" {
+		endpoint += "&page_token=" + url.QueryEscape(pageToken)
 	}
-
-	return &response, nil
+	return endpoint
 }
 
-// ListExperiments lists all experiments
-func (c *Client) ListExperiments(maxResults int, pageToken string) (*ListExperimentsResponse, error) {
-	endpoint := "/api/2.0/mlflow/experiments/list"
+// endpointRegisteredModelsListWithParams returns the endpoint for listing registered models with query parameters
+func endpointRegisteredModelsListWithParams(maxResults int, pageToken string) string {
+	endpoint := endpointRegisteredModelsList
 	if maxResults > 0 || pageToken != "" {
 		params := url.Values{}
 		if maxResults > 0 {
@@ -158,31 +246,115 @@ func (c *Client) ListExperiments(maxResults int, pageToken string) (*ListExperim
 		}
 		endpoint += "?" + params.Encode()
 	}
+	return endpoint
+}
 
-	respBody, err := c.doRequest("GET", endpoint, nil)
+// endpointModelVersionsListWithParams returns the endpoint for listing model versions with query parameters
+func endpointModelVersionsListWithParams(name string, maxResults int, pageToken string) string {
+	endpoint := fmt.Sprintf("%s?name=%s", endpointModelVersionsList, url.QueryEscape(name))
+	if maxResults > 0 || pageToken != "" {
+		params := url.Values{}
+		if maxResults > 0 {
+			params.Add("max_results", fmt.Sprintf("%d", maxResults))
+		}
+		if pageToken != "" {
+			params.Add("page_token", pageToken)
+		}
+		endpoint += "&" + params.Encode()
+	}
+	return endpoint
+}
+
+// endpointRegisteredModelsGetLatestVersionsWithParams returns the endpoint for getting latest model versions with query parameters
+func endpointRegisteredModelsGetLatestVersionsWithParams(name string, stages []string) string {
+	endpoint := fmt.Sprintf("%s?name=%s", endpointRegisteredModelsGetLatestVersions, url.QueryEscape(name))
+	if len(stages) > 0 {
+		params := url.Values{}
+		for _, stage := range stages {
+			params.Add("stages", stage)
+		}
+		endpoint += "&" + params.Encode()
+	}
+	return endpoint
+}
+
+// endpointModelVersionsSearchWithParams returns the endpoint for searching model versions with query parameters
+func endpointModelVersionsSearchWithParams(filter string, maxResults int, orderBy []string, pageToken string) string {
+	endpoint := endpointModelVersionsSearch
+	params := url.Values{}
+	if filter != "" {
+		params.Add("filter", filter)
+	}
+	if maxResults > 0 {
+		params.Add("max_results", fmt.Sprintf("%d", maxResults))
+	}
+	if len(orderBy) > 0 {
+		for _, order := range orderBy {
+			params.Add("order_by", order)
+		}
+	}
+	if pageToken != "" {
+		params.Add("page_token", pageToken)
+	}
+	if len(params) > 0 {
+		endpoint += "?" + params.Encode()
+	}
+	return endpoint
+}
+
+// Experiments API
+
+// CreateExperiment creates a new experiment
+func (c *Client) CreateExperiment(req CreateExperimentRequest) (*CreateExperimentResponse, error) {
+	respBody, err := c.doRequest(http.MethodPost, endpointExperimentsCreate, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response ListExperimentsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	return unmarshalResponse[CreateExperimentResponse](respBody)
+}
+
+// GetExperiment gets an experiment by ID
+func (c *Client) GetExperiment(experimentID string) (*GetExperimentResponse, error) {
+	req := GetExperimentRequest{
+		ExperimentID: experimentID,
+	}
+	respBody, err := c.doRequest(http.MethodGet, endpointExperimentsGetBase, req)
+	if err != nil {
+		return nil, err
 	}
 
-	return &response, nil
+	return unmarshalResponse[GetExperimentResponse](respBody)
+}
+
+// GetExperimentByName gets an experiment by name
+func (c *Client) GetExperimentByName(experimentName string) (*GetExperimentResponse, error) {
+	req := GetExperimentByNameRequest{
+		ExperimentName: experimentName,
+	}
+	respBody, err := c.doRequest(http.MethodGet, endpointExperimentsGetByNameBase, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return unmarshalResponse[GetExperimentResponse](respBody)
 }
 
 // DeleteExperiment deletes an experiment
 func (c *Client) DeleteExperiment(experimentID string) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/experiments/delete?experiment_id=%s", url.QueryEscape(experimentID))
-	_, err := c.doRequest("POST", endpoint, nil)
+	req := map[string]string{
+		"experiment_id": experimentID,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointExperimentsDeleteBase, req)
 	return err
 }
 
 // RestoreExperiment restores a deleted experiment
 func (c *Client) RestoreExperiment(experimentID string) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/experiments/restore?experiment_id=%s", url.QueryEscape(experimentID))
-	_, err := c.doRequest("POST", endpoint, nil)
+	req := map[string]string{
+		"experiment_id": experimentID,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointExperimentsRestoreBase, req)
 	return err
 }
 
@@ -192,8 +364,7 @@ func (c *Client) UpdateExperiment(experimentID, newName string) error {
 		"experiment_id": experimentID,
 		"new_name":      newName,
 	}
-	endpoint := "/api/2.0/mlflow/experiments/update"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointExperimentsUpdate, req)
 	return err
 }
 
@@ -204,8 +375,7 @@ func (c *Client) SetExperimentTag(experimentID, key, value string) error {
 		"key":           key,
 		"value":         value,
 	}
-	endpoint := "/api/2.0/mlflow/experiments/set-experiment-tag"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointExperimentsSetTag, req)
 	return err
 }
 
@@ -215,25 +385,21 @@ func (c *Client) DeleteExperimentTag(experimentID, key string) error {
 		"experiment_id": experimentID,
 		"key":           key,
 	}
-	endpoint := "/api/2.0/mlflow/experiments/delete-experiment-tag"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointExperimentsDeleteTag, req)
 	return err
 }
 
 // SearchExperiments searches for experiments
 func (c *Client) SearchExperiments(req SearchExperimentsRequest) (*SearchExperimentsResponse, error) {
-	endpoint := "/api/2.0/mlflow/experiments/search"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	if req.MaxResults <= 0 {
+		return nil, fmt.Errorf("max_results must be greater than zero when provided")
+	}
+	respBody, err := c.doRequest(http.MethodPost, endpointExperimentsSearch, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response SearchExperimentsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[SearchExperimentsResponse](respBody)
 }
 
 // Runs API
@@ -244,79 +410,65 @@ func (c *Client) CreateRun(req CreateRunRequest) (*CreateRunResponse, error) {
 		req.StartTime = time.Now().UnixMilli()
 	}
 
-	endpoint := "/api/2.0/mlflow/runs/create"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	respBody, err := c.doRequest(http.MethodPost, endpointRunsCreate, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response CreateRunResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[CreateRunResponse](respBody)
 }
 
 // GetRun gets a run by ID
 func (c *Client) GetRun(runID string) (*GetRunResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/runs/get?run_id=%s", url.QueryEscape(runID))
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	req := GetRunRequest{
+		RunID: runID,
+	}
+	respBody, err := c.doRequest(http.MethodPost, endpointRunsGet, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetRunResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetRunResponse](respBody)
 }
 
 // SearchRuns searches for runs
 func (c *Client) SearchRuns(req SearchRunsRequest) (*SearchRunsResponse, error) {
-	endpoint := "/api/2.0/mlflow/runs/search"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	if req.MaxResults <= 0 {
+		return nil, fmt.Errorf("max_results must be greater than zero when provided")
+	}
+	respBody, err := c.doRequest(http.MethodPost, endpointRunsSearch, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response SearchRunsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[SearchRunsResponse](respBody)
 }
 
 // UpdateRun updates a run
 func (c *Client) UpdateRun(req UpdateRunRequest) (*UpdateRunResponse, error) {
-	endpoint := "/api/2.0/mlflow/runs/update"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	respBody, err := c.doRequest(http.MethodPost, endpointRunsUpdate, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response UpdateRunResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[UpdateRunResponse](respBody)
 }
 
 // DeleteRun deletes a run
 func (c *Client) DeleteRun(runID string) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/runs/delete?run_id=%s", url.QueryEscape(runID))
-	_, err := c.doRequest("POST", endpoint, nil)
+	req := map[string]string{
+		"run_id": runID,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointRunsDelete, req)
 	return err
 }
 
 // RestoreRun restores a deleted run
 func (c *Client) RestoreRun(runID string) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/runs/restore?run_id=%s", url.QueryEscape(runID))
-	_, err := c.doRequest("POST", endpoint, nil)
+	req := map[string]string{
+		"run_id": runID,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointRunsRestore, req)
 	return err
 }
 
@@ -329,22 +481,19 @@ func (c *Client) LogMetric(req LogMetricRequest) error {
 		req.Step = 0
 	}
 
-	endpoint := "/api/2.0/mlflow/runs/log-metric"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRunsLogMetric, req)
 	return err
 }
 
 // LogParam logs a parameter to a run
 func (c *Client) LogParam(req LogParamRequest) error {
-	endpoint := "/api/2.0/mlflow/runs/log-parameter"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRunsLogParameter, req)
 	return err
 }
 
 // SetTag sets a tag on a run
 func (c *Client) SetTag(req SetTagRequest) error {
-	endpoint := "/api/2.0/mlflow/runs/set-tag"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRunsSetTag, req)
 	return err
 }
 
@@ -354,8 +503,7 @@ func (c *Client) DeleteTag(runID, key string) error {
 		"run_id": runID,
 		"key":    key,
 	}
-	endpoint := "/api/2.0/mlflow/runs/delete-tag"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRunsDeleteTag, req)
 	return err
 }
 
@@ -367,135 +515,75 @@ func (c *Client) LogBatch(runID string, metrics []Metric, params []Param, tags [
 		"params":  params,
 		"tags":    tags,
 	}
-	endpoint := "/api/2.0/mlflow/runs/log-batch"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRunsLogBatch, req)
 	return err
 }
 
 // LogModel logs a model to a run
 func (c *Client) LogModel(req LogModelRequest) error {
-	endpoint := "/api/2.0/mlflow/runs/log-model"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRunsLogModel, req)
 	return err
 }
 
 // LogInputs logs inputs (datasets and/or model inputs) to a run
 func (c *Client) LogInputs(req LogInputsRequest) error {
-	endpoint := "/api/2.0/mlflow/runs/log-inputs"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRunsLogInputs, req)
 	return err
 }
 
 // GetMetricHistory gets the history of a metric for a run
 func (c *Client) GetMetricHistory(req GetMetricHistoryRequest) (*GetMetricHistoryResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/metrics/get-history?run_uuid=%s&metric_key=%s",
-		url.QueryEscape(req.RunUUID), url.QueryEscape(req.MetricKey))
-	if req.MaxResults > 0 || req.PageToken != "" {
-		params := url.Values{}
-		if req.MaxResults > 0 {
-			params.Add("max_results", fmt.Sprintf("%d", req.MaxResults))
-		}
-		if req.PageToken != "" {
-			params.Add("page_token", req.PageToken)
-		}
-		endpoint += "&" + params.Encode()
-	}
-
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	respBody, err := c.doRequest(http.MethodGet, endpointMetricsGetHistory(req.RunUUID, req.MetricKey, req.MaxResults, req.PageToken), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetMetricHistoryResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetMetricHistoryResponse](respBody)
 }
 
 // ListArtifacts lists artifacts for a run
 func (c *Client) ListArtifacts(runID, path string, pageToken string) (*ListArtifactsResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/artifacts/list?run_id=%s", url.QueryEscape(runID))
-	if path != "" {
-		endpoint += "&path=" + url.QueryEscape(path)
-	}
-	if pageToken != "" {
-		endpoint += "&page_token=" + url.QueryEscape(pageToken)
-	}
-
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	respBody, err := c.doRequest(http.MethodGet, endpointArtifactsList(runID, path, pageToken), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response ListArtifactsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[ListArtifactsResponse](respBody)
 }
 
 // Models API
 
 // CreateRegisteredModel creates a new registered model
 func (c *Client) CreateRegisteredModel(req CreateRegisteredModelRequest) (*CreateRegisteredModelResponse, error) {
-	endpoint := "/api/2.0/mlflow/registered-models/create"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsCreate, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response CreateRegisteredModelResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[CreateRegisteredModelResponse](respBody)
 }
 
 // GetRegisteredModel gets a registered model by name
 func (c *Client) GetRegisteredModel(name string) (*GetRegisteredModelResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/get?name=%s", url.QueryEscape(name))
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	req := GetRegisteredModelRequest{
+		Name: name,
+	}
+	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsGet, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetRegisteredModelResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetRegisteredModelResponse](respBody)
 }
 
 // ListRegisteredModels lists all registered models
 func (c *Client) ListRegisteredModels(maxResults int, pageToken string) (*ListRegisteredModelsResponse, error) {
-	endpoint := "/api/2.0/mlflow/registered-models/list"
-	if maxResults > 0 || pageToken != "" {
-		params := url.Values{}
-		if maxResults > 0 {
-			params.Add("max_results", fmt.Sprintf("%d", maxResults))
-		}
-		if pageToken != "" {
-			params.Add("page_token", pageToken)
-		}
-		endpoint += "?" + params.Encode()
-	}
-
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	respBody, err := c.doRequest(http.MethodGet, endpointRegisteredModelsListWithParams(maxResults, pageToken), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response ListRegisteredModelsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[ListRegisteredModelsResponse](respBody)
 }
 
 // UpdateRegisteredModel updates a registered model
@@ -506,76 +594,51 @@ func (c *Client) UpdateRegisteredModel(name, description string) error {
 	if description != "" {
 		req["description"] = description
 	}
-	endpoint := "/api/2.0/mlflow/registered-models/update"
-	_, err := c.doRequest("PATCH", endpoint, req)
+	_, err := c.doRequest(http.MethodPatch, endpointRegisteredModelsUpdate, req)
 	return err
 }
 
 // DeleteRegisteredModel deletes a registered model
 func (c *Client) DeleteRegisteredModel(name string) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/delete?name=%s", url.QueryEscape(name))
-	_, err := c.doRequest("DELETE", endpoint, nil)
+	req := map[string]string{
+		"name": name,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsDelete, req)
 	return err
 }
 
 // CreateModelVersion creates a new model version
 func (c *Client) CreateModelVersion(req CreateModelVersionRequest) (*CreateModelVersionResponse, error) {
-	endpoint := "/api/2.0/mlflow/model-versions/create"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	respBody, err := c.doRequest(http.MethodPost, endpointModelVersionsCreate, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response CreateModelVersionResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[CreateModelVersionResponse](respBody)
 }
 
 // GetModelVersion gets a model version
 func (c *Client) GetModelVersion(name, version string) (*GetModelVersionResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/model-versions/get?name=%s&version=%s",
-		url.QueryEscape(name), url.QueryEscape(version))
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	req := GetModelVersionRequest{
+		Name:    name,
+		Version: version,
+	}
+	respBody, err := c.doRequest(http.MethodPost, endpointModelVersionsGetBase, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetModelVersionResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetModelVersionResponse](respBody)
 }
 
 // ListModelVersions lists model versions for a registered model
 func (c *Client) ListModelVersions(name string, maxResults int, pageToken string) (*ListModelVersionsResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/model-versions/list?name=%s", url.QueryEscape(name))
-	if maxResults > 0 || pageToken != "" {
-		params := url.Values{}
-		if maxResults > 0 {
-			params.Add("max_results", fmt.Sprintf("%d", maxResults))
-		}
-		if pageToken != "" {
-			params.Add("page_token", pageToken)
-		}
-		endpoint += "&" + params.Encode()
-	}
-
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	respBody, err := c.doRequest(http.MethodGet, endpointModelVersionsListWithParams(name, maxResults, pageToken), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response ListModelVersionsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[ListModelVersionsResponse](respBody)
 }
 
 // UpdateModelVersion updates a model version
@@ -590,16 +653,17 @@ func (c *Client) UpdateModelVersion(name, version, description, stage string) er
 	if stage != "" {
 		req["stage"] = stage
 	}
-	endpoint := "/api/2.0/mlflow/model-versions/update"
-	_, err := c.doRequest("PATCH", endpoint, req)
+	_, err := c.doRequest(http.MethodPatch, endpointModelVersionsUpdate, req)
 	return err
 }
 
 // DeleteModelVersion deletes a model version
 func (c *Client) DeleteModelVersion(name, version string) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/model-versions/delete?name=%s&version=%s",
-		url.QueryEscape(name), url.QueryEscape(version))
-	_, err := c.doRequest("DELETE", endpoint, nil)
+	req := map[string]string{
+		"name":    name,
+		"version": version,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointModelVersionsDeleteBase, req)
 	return err
 }
 
@@ -613,188 +677,127 @@ func (c *Client) TransitionModelVersionStage(name, version, stage, archiveExisti
 	if archiveExistingVersions != "" {
 		req["archive_existing_versions"] = archiveExistingVersions
 	}
-	endpoint := "/api/2.0/mlflow/model-versions/transition-stage"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	respBody, err := c.doRequest(http.MethodPost, endpointModelVersionsTransitionStage, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetModelVersionResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetModelVersionResponse](respBody)
 }
 
 // RenameRegisteredModel renames a registered model
 func (c *Client) RenameRegisteredModel(req RenameRegisteredModelRequest) (*RenameRegisteredModelResponse, error) {
-	endpoint := "/api/2.0/mlflow/registered-models/rename"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsRename, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response RenameRegisteredModelResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[RenameRegisteredModelResponse](respBody)
 }
 
 // GetLatestModelVersions gets the latest model versions for a registered model
 func (c *Client) GetLatestModelVersions(req GetLatestModelVersionsRequest) (*GetLatestModelVersionsResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/get-latest-versions?name=%s", url.QueryEscape(req.Name))
-	if len(req.Stages) > 0 {
-		params := url.Values{}
-		for _, stage := range req.Stages {
-			params.Add("stages", stage)
-		}
-		endpoint += "&" + params.Encode()
-	}
-
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	respBody, err := c.doRequest(http.MethodGet, endpointRegisteredModelsGetLatestVersionsWithParams(req.Name, req.Stages), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetLatestModelVersionsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetLatestModelVersionsResponse](respBody)
 }
 
 // SearchModelVersions searches for model versions
 func (c *Client) SearchModelVersions(req SearchModelVersionsRequest) (*SearchModelVersionsResponse, error) {
-	endpoint := "/api/2.0/mlflow/model-versions/search"
-	// Build query parameters for GET request
-	params := url.Values{}
-	if req.Filter != "" {
-		params.Add("filter", req.Filter)
+	if req.MaxResults <= 0 {
+		return nil, fmt.Errorf("max_results must be greater than zero when provided")
 	}
-	if req.MaxResults > 0 {
-		params.Add("max_results", fmt.Sprintf("%d", req.MaxResults))
-	}
-	if len(req.OrderBy) > 0 {
-		for _, order := range req.OrderBy {
-			params.Add("order_by", order)
-		}
-	}
-	if req.PageToken != "" {
-		params.Add("page_token", req.PageToken)
-	}
-	if len(params) > 0 {
-		endpoint += "?" + params.Encode()
-	}
-
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	respBody, err := c.doRequest(http.MethodGet, endpointModelVersionsSearchWithParams(req.Filter, req.MaxResults, req.OrderBy, req.PageToken), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response SearchModelVersionsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[SearchModelVersionsResponse](respBody)
 }
 
 // GetDownloadURIs gets download URIs for model version artifacts
 func (c *Client) GetDownloadURIs(req GetDownloadURIsRequest) (*GetDownloadURIsResponse, error) {
-	endpoint := "/api/2.0/mlflow/model-versions/get-download-uris"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	respBody, err := c.doRequest(http.MethodPost, endpointModelVersionsGetDownloadURIs, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetDownloadURIsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetDownloadURIsResponse](respBody)
 }
 
 // SearchRegisteredModels searches for registered models
 func (c *Client) SearchRegisteredModels(req SearchRegisteredModelsRequest) (*SearchRegisteredModelsResponse, error) {
-	endpoint := "/api/2.0/mlflow/registered-models/search"
-	respBody, err := c.doRequest("POST", endpoint, req)
+	if req.MaxResults <= 0 {
+		return nil, fmt.Errorf("max_results must be greater than zero when provided")
+	}
+	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsSearch, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response SearchRegisteredModelsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[SearchRegisteredModelsResponse](respBody)
 }
 
 // SetRegisteredModelTag sets a tag on a registered model
 func (c *Client) SetRegisteredModelTag(req SetRegisteredModelTagRequest) error {
-	endpoint := "/api/2.0/mlflow/registered-models/set-tag"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsSetTag, req)
 	return err
 }
 
 // SetModelVersionTag sets a tag on a model version
 func (c *Client) SetModelVersionTag(req SetModelVersionTagRequest) error {
-	endpoint := "/api/2.0/mlflow/model-versions/set-tag"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointModelVersionsSetTag, req)
 	return err
 }
 
 // DeleteRegisteredModelTag deletes a tag from a registered model
 func (c *Client) DeleteRegisteredModelTag(req DeleteRegisteredModelTagRequest) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/delete-tag?name=%s&key=%s",
-		url.QueryEscape(req.Name), url.QueryEscape(req.Key))
-	_, err := c.doRequest("DELETE", endpoint, nil)
+	reqBody := map[string]string{
+		"name": req.Name,
+		"key":  req.Key,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsDeleteTagBase, reqBody)
 	return err
 }
 
 // DeleteModelVersionTag deletes a tag from a model version
 func (c *Client) DeleteModelVersionTag(req DeleteModelVersionTagRequest) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/model-versions/delete-tag?name=%s&version=%s&key=%s",
-		url.QueryEscape(req.Name), url.QueryEscape(req.Version), url.QueryEscape(req.Key))
-	_, err := c.doRequest("DELETE", endpoint, nil)
+	reqBody := map[string]string{
+		"name":    req.Name,
+		"version": req.Version,
+		"key":     req.Key,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointModelVersionsDeleteTagBase, reqBody)
 	return err
 }
 
 // SetRegisteredModelAlias sets an alias for a registered model
 func (c *Client) SetRegisteredModelAlias(req SetRegisteredModelAliasRequest) error {
-	endpoint := "/api/2.0/mlflow/registered-models/alias"
-	_, err := c.doRequest("POST", endpoint, req)
+	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsAliasBase, req)
 	return err
 }
 
 // DeleteRegisteredModelAlias deletes an alias from a registered model
 func (c *Client) DeleteRegisteredModelAlias(req DeleteRegisteredModelAliasRequest) error {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/alias?name=%s&alias=%s",
-		url.QueryEscape(req.Name), url.QueryEscape(req.Alias))
-	_, err := c.doRequest("DELETE", endpoint, nil)
+	reqBody := map[string]string{
+		"name":  req.Name,
+		"alias": req.Alias,
+	}
+	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsAliasBase, reqBody)
 	return err
 }
 
 // GetModelVersionByAlias gets a model version by alias
 func (c *Client) GetModelVersionByAlias(req GetModelVersionByAliasRequest) (*GetModelVersionByAliasResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/get-model-version-by-alias?name=%s&alias=%s",
-		url.QueryEscape(req.Name), url.QueryEscape(req.Alias))
-	respBody, err := c.doRequest("GET", endpoint, nil)
+	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsGetModelVersionByAliasBase, req)
 	if err != nil {
 		return nil, err
 	}
 
-	var response GetModelVersionByAliasResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &response, nil
+	return unmarshalResponse[GetModelVersionByAliasResponse](respBody)
 }
 
 // doTextRequest performs an HTTP request and returns the response as a string
@@ -833,10 +836,10 @@ func (c *Client) doTextRequest(method, endpoint string) (string, error) {
 
 // GetHealth gets the health status of the MLflow server
 func (c *Client) GetHealth() (string, error) {
-	return c.doTextRequest("GET", "/health")
+	return c.doTextRequest(http.MethodGet, endpointHealth)
 }
 
 // GetVersion gets the version of the MLflow server
 func (c *Client) GetVersion() (string, error) {
-	return c.doTextRequest("GET", "/version")
+	return c.doTextRequest(http.MethodGet, endpointVersion)
 }

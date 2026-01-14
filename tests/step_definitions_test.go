@@ -210,6 +210,10 @@ func (tc *testContext) serverIsRunning(url string) error {
 	testURL := os.Getenv("MLFLOW_TEST_URL")
 	if testURL != "" {
 		tc.client = mlflow.NewClient(testURL)
+		// now chekc the server is running and has a version that we can handle
+		if err := tc.client.CheckServer(); err != nil {
+			return err
+		}
 		return nil
 	}
 	return fmt.Errorf("MLFLOW_TEST_URL is not set")
@@ -352,7 +356,10 @@ func (tc *testContext) multipleExperimentsExist() error {
 }
 
 func (tc *testContext) listExperiments() error {
-	resp, err := tc.client.ListExperiments(100, "")
+	req := mlflow.SearchExperimentsRequest{
+		MaxResults: 100,
+	}
+	resp, err := tc.client.SearchExperiments(req)
 	if err != nil {
 		tc.lastError = err
 		return err
@@ -362,9 +369,9 @@ func (tc *testContext) listExperiments() error {
 }
 
 func (tc *testContext) getListOfExperiments() error {
-	resp, ok := tc.lastResponse.(*mlflow.ListExperimentsResponse)
+	resp, ok := tc.lastResponse.(*mlflow.SearchExperimentsResponse)
 	if !ok {
-		return fmt.Errorf("expected ListExperimentsResponse")
+		return fmt.Errorf("expected SearchExperimentsResponse")
 	}
 	if resp.Experiments == nil {
 		return fmt.Errorf("experiments list is nil")
@@ -373,9 +380,9 @@ func (tc *testContext) getListOfExperiments() error {
 }
 
 func (tc *testContext) listContainsExperiments(count int) error {
-	resp, ok := tc.lastResponse.(*mlflow.ListExperimentsResponse)
+	resp, ok := tc.lastResponse.(*mlflow.SearchExperimentsResponse)
 	if !ok {
-		return fmt.Errorf("expected ListExperimentsResponse")
+		return fmt.Errorf("expected SearchExperimentsResponse")
 	}
 	if len(resp.Experiments) < count {
 		return fmt.Errorf("expected at least %d experiments, got %d", count, len(resp.Experiments))
@@ -385,7 +392,8 @@ func (tc *testContext) listContainsExperiments(count int) error {
 
 func (tc *testContext) searchExperiments(filter string) error {
 	req := mlflow.SearchExperimentsRequest{
-		Filter: filter,
+		MaxResults: 100,
+		Filter:     filter,
 	}
 	resp, err := tc.client.SearchExperiments(req)
 	if err != nil {

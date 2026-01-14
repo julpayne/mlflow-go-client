@@ -23,10 +23,10 @@ import (
 func main() {
     // Create a new client
     client := mlflow.NewClient("http://localhost:5000")
-    
+
     // Optional: Set authentication token
     client.SetAuthToken("your-token-here")
-    
+
     // Optional: Set custom timeout
     client.SetTimeout(60 * time.Second)
 }
@@ -70,10 +70,13 @@ if err != nil {
 fmt.Printf("Experiment: %s\n", experiment.Experiment.Name)
 ```
 
-#### List Experiments
+#### List Experiments (using SearchExperiments)
 
 ```go
-experiments, err := client.ListExperiments(100, "")
+searchReq := mlflow.SearchExperimentsRequest{
+    MaxResults: 100,
+}
+experiments, err := client.SearchExperiments(searchReq)
 if err != nil {
     log.Fatal(err)
 }
@@ -216,7 +219,7 @@ if err != nil {
 }
 
 for _, run := range results.Runs {
-    fmt.Printf("Run: %s, Accuracy: %f\n", run.Info.RunID, 
+    fmt.Printf("Run: %s, Accuracy: %f\n", run.Info.RunID,
         getMetricValue(run.Data.Metrics, "accuracy"))
 }
 ```
@@ -391,8 +394,8 @@ err := client.UpdateModelVersion("my-model", "1", "Updated description", "Produc
 
 // Transition model version stage
 version, err := client.TransitionModelVersionStage(
-    "my-model", 
-    "1", 
+    "my-model",
+    "1",
     "Production",
     "true", // archive existing versions
 )
@@ -469,8 +472,7 @@ This client supports the following MLflow API endpoints:
 - ✅ Create experiment
 - ✅ Get experiment (by ID)
 - ✅ Get experiment (by name)
-- ✅ List experiments
-- ✅ Search experiments
+- ✅ Search experiments (use instead of list)
 - ✅ Update experiment
 - ✅ Delete experiment
 - ✅ Restore experiment

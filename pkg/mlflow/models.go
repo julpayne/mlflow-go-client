@@ -260,10 +260,14 @@ type CreateModelVersionResponse struct {
 	ModelVersion ModelVersion `json:"model_version"`
 }
 
-// ListExperimentsResponse represents the response from listing experiments
-type ListExperimentsResponse struct {
-	Experiments   []Experiment `json:"experiments"`
-	NextPageToken string       `json:"next_page_token,omitempty"`
+// GetExperimentRequest represents a request to get an experiment
+type GetExperimentRequest struct {
+	ExperimentID string `json:"experiment_id"`
+}
+
+// GetExperimentByNameRequest represents a request to get an experiment by name
+type GetExperimentByNameRequest struct {
+	ExperimentName string `json:"experiment_name"`
 }
 
 // GetExperimentResponse represents the response from getting an experiment
@@ -271,14 +275,30 @@ type GetExperimentResponse struct {
 	Experiment Experiment `json:"experiment"`
 }
 
+// GetRunRequest represents a request to get a run
+type GetRunRequest struct {
+	RunID string `json:"run_id"`
+}
+
 // GetRunResponse represents the response from getting a run
 type GetRunResponse struct {
 	Run Run `json:"run"`
 }
 
+// GetRegisteredModelRequest represents a request to get a registered model
+type GetRegisteredModelRequest struct {
+	Name string `json:"name"`
+}
+
 // GetRegisteredModelResponse represents the response from getting a registered model
 type GetRegisteredModelResponse struct {
 	RegisteredModel RegisteredModel `json:"registered_model"`
+}
+
+// GetModelVersionRequest represents a request to get a model version
+type GetModelVersionRequest struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 // GetModelVersionResponse represents the response from getting a model version
