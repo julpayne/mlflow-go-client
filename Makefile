@@ -1,11 +1,11 @@
-.PHONY: help install-mlflow run-mlflow stop-mlflow build test clean fmt vet lint example
+.PHONY: help install-mlflow run-mlflow stop-mlflow deps build test clean fmt vet lint example
 
 # Default target
 .DEFAULT_GOAL := help
 
 # Variables
 MLFLOW_HOST ?= 127.0.0.1
-MLFLOW_PORT ?= 5000
+MLFLOW_PORT ?= 5001
 MLFLOW_BACKEND_STORE_URI ?= sqlite:///mlflow.db
 MLFLOW_DEFAULT_ARTIFACT_ROOT ?= ./mlruns
 
@@ -16,8 +16,11 @@ help:
 	@echo "  make install-mlflow    - Download and install MLflow server"
 	@echo "  make run-mlflow         - Run MLflow server locally"
 	@echo "  make stop-mlflow        - Stop MLflow server (if running)"
+	@echo "  make deps               - Download all Go dependencies"
 	@echo "  make build              - Build the Go client library"
 	@echo "  make test               - Run tests"
+	@echo "  make test-godog         - Run godog BDD tests (requires MLflow server)"
+	@echo "  make test-godog-server  - Run godog BDD tests with automatic server"
 	@echo "  make fmt                - Format Go code"
 	@echo "  make vet                - Run go vet"
 	@echo "  make lint               - Run golangci-lint (if installed)"
@@ -40,8 +43,10 @@ install-mlflow:
 	@echo "📥 Installing MLflow server..."
 	@./scripts/download_mlflow.sh
 
-## run-mlflow: Run MLflow server locally
+## run-mlflow: Run MLflow server locally in the background
 run-mlflow:
+	@echo "🛑 Stopping MLflow server..."
+	- @make stop-mlflow
 	@echo "🚀 Starting MLflow server..."
 	@echo "   Host: $(MLFLOW_HOST)"
 	@echo "   Port: $(MLFLOW_PORT)"
@@ -53,11 +58,27 @@ run-mlflow:
 	 MLFLOW_BACKEND_STORE_URI=$(MLFLOW_BACKEND_STORE_URI) \
 	 MLFLOW_DEFAULT_ARTIFACT_ROOT=$(MLFLOW_DEFAULT_ARTIFACT_ROOT) \
 	 ./scripts/run_mlflow.sh
+	@echo "   MLflow server started in background. Use 'make stop-mlflow' to stop it."
+	@echo "   You can use 'make test-godog-server' to run BDD tests with the server automatically."
+	@echo ""
+	@echo "   To use the server in your tests:"
+	@echo "   - Set MLFLOW_TEST_URL=http://localhost:5000 in your test environment"
+	@echo "   - Run tests with 'make test-godog'"
+	@echo ""
+	@echo "   To stop the server:"
+	@echo "   make stop-mlflow"
 
 ## stop-mlflow: Stop MLflow server (if running)
 stop-mlflow:
-	@echo "🛑 Stopping MLflow server..."
-	@pkill -f "mlflow server" || echo "No MLflow server process found"
+	./scripts/stop_mlflow.sh
+
+## deps: Download all Go dependencies
+deps:
+	@echo "📦 Downloading Go dependencies..."
+	@go mod download
+	@echo "🔧 Tidying go.mod and go.sum..."
+	@go mod tidy
+	@echo "✅ Dependencies downloaded and synced"
 
 ## build: Build the Go client library
 build:
@@ -68,6 +89,18 @@ build:
 test:
 	@echo "🧪 Running tests..."
 	@go test -v ./...
+
+## test-godog: Run godog BDD tests
+test-godog:
+	@echo "🧪 Running godog BDD tests..."
+	@echo "   Make sure MLflow server is running or set MLFLOW_TEST_URL"
+	@cd tests/features && go test -v -tags=godog
+
+## test-godog-server: Run godog tests with automatic server management
+test-godog-server: run-mlflow ; $(info The MLflow server was successfully started)
+	@echo "🧪 Running godog BDD tests with test server..."
+	@cd tests/features && MLFLOW_TEST_PORT=5001 go test -v -tags=godog
+	@make stop-mlflow
 
 ## fmt: Format Go code
 fmt:
@@ -100,3 +133,7 @@ clean:
 	@rm -f mlflow.db
 	@rm -rf mlruns
 	@rm -rf *.db
+
+.PHONY: cls
+cls:
+	printf "\33c\e[3J"
