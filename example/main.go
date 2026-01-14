@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/julpayne/mlflow-go-client"
+	"github.com/julpayne/mlflow-go-client/pkg/mlflow"
 )
 
 func main() {

@@ -31,3 +31,4 @@ Thumbs.db
 # MLflow files
 mlruns/
 *.db
+venv/

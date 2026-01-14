@@ -5,7 +5,7 @@ A comprehensive Go client library for interacting with the MLflow REST API.
 ## Installation
 
 ```bash
-go get github.com/julpayne/mlflow-go-client
+go get github.com/julpayne/mlflow-go-client/pkg/mlflow
 ```
 
 ## Usage
@@ -17,7 +17,7 @@ package main
 
 import (
     "fmt"
-    "github.com/julpayne/mlflow-go-client"
+    "github.com/julpayne/mlflow-go-client/pkg/mlflow"
 )
 
 func main() {

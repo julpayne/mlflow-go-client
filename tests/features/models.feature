@@ -2,6 +2,8 @@ Feature: MLflow Models API
   As a developer
   I want to manage MLflow registered models
   So that I can version and deploy my models
+  When I check the server health
+  Then the health status should be "OK"
 
   Background:
     Given an MLflow server is running at "http://localhost:5000"

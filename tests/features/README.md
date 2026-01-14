@@ -47,7 +47,7 @@ make test-godog-server
 
 **Option 3: Run directly with go test**
 ```bash
-cd tests/features
+cd tests
 go test -v
 ```
 

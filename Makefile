@@ -47,6 +47,7 @@ install-mlflow:
 run-mlflow:
 	@echo "🛑 Stopping MLflow server..."
 	- @make stop-mlflow
+	- @rm -f mlflow.db tests/features/test_mlflow_${MLFLOW_PORT}.db
 	@echo "🚀 Starting MLflow server..."
 	@echo "   Host: $(MLFLOW_HOST)"
 	@echo "   Port: $(MLFLOW_PORT)"
@@ -94,15 +95,14 @@ test:
 test-godog:
 	@echo "🧪 Running godog BDD tests..."
 	@echo "   Make sure MLflow server is running or set MLFLOW_TEST_URL"
-	@cd tests/features && go test -v -tags=godog
+	@cd tests && go test -v -tags=godog
 
 MLFLOW_TEST_URL ?= http://$(MLFLOW_HOST):$(MLFLOW_PORT)
 
 ## test-godog-server: Run godog tests with automatic server management
 test-godog-server: run-mlflow ; $(info The MLflow server was successfully started)
 	@echo "🧪 Running godog BDD tests with test server..."
-	@rm -f mlflow.db tests/features/test_mlflow_${MLFLOW_PORT}.db
-	@cd tests/features && MLFLOW_TEST_URL=${MLFLOW_TEST_URL} go test -v -tags=godog
+	@cd tests && MLFLOW_TEST_URL=${MLFLOW_TEST_URL} go test -v -tags=godog
 	@make stop-mlflow
 
 ## fmt: Format Go code

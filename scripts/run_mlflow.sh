@@ -50,6 +50,8 @@ if [[ "$BACKEND_URI" == sqlite://* ]]; then
 fi
 
 echo -e "${GREEN}✅ Starting MLflow server...${NC}"
+MLFLOW_VERSION=$(mlflow --version 2>/dev/null | head -n 1)
+echo -e "${BLUE}📍 MLflow version: ${MLFLOW_VERSION}${NC}"
 echo -e "${BLUE}📍 Server will be available at: http://$HOST:$PORT${NC}"
 echo -e "${YELLOW}💡 Press Ctrl+C to stop the server${NC}"
 echo ""
