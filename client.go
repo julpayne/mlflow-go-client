@@ -76,10 +76,20 @@ func (c *Client) doRequest(method, endpoint string, body interface{}) ([]byte, e
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errorResp ErrorResponse
-		if err := json.Unmarshal(respBody, &errorResp); err == nil {
-			return nil, fmt.Errorf("API error: %s - %s", errorResp.ErrorCode, errorResp.Message)
+		apiErr := &APIError{
+			StatusCode:   resp.StatusCode,
+			ResponseBody: respBody,
 		}
-		return nil, fmt.Errorf("API error: status %d, body: %s", resp.StatusCode, string(respBody))
+
+		if err := json.Unmarshal(respBody, &errorResp); err == nil {
+			apiErr.ErrorCode = errorResp.ErrorCode
+			apiErr.Message = errorResp.Message
+		} else {
+			// If we can't parse the error response, use the raw body as message
+			apiErr.Message = string(respBody)
+		}
+
+		return nil, apiErr
 	}
 
 	return respBody, nil
@@ -197,6 +207,33 @@ func (c *Client) SetExperimentTag(experimentID, key, value string) error {
 	endpoint := "/api/2.0/mlflow/experiments/set-experiment-tag"
 	_, err := c.doRequest("POST", endpoint, req)
 	return err
+}
+
+// DeleteExperimentTag deletes a tag from an experiment
+func (c *Client) DeleteExperimentTag(experimentID, key string) error {
+	req := map[string]string{
+		"experiment_id": experimentID,
+		"key":           key,
+	}
+	endpoint := "/api/2.0/mlflow/experiments/delete-experiment-tag"
+	_, err := c.doRequest("POST", endpoint, req)
+	return err
+}
+
+// SearchExperiments searches for experiments
+func (c *Client) SearchExperiments(req SearchExperimentsRequest) (*SearchExperimentsResponse, error) {
+	endpoint := "/api/2.0/mlflow/experiments/search"
+	respBody, err := c.doRequest("POST", endpoint, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var response SearchExperimentsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
 }
 
 // Runs API
@@ -335,6 +372,71 @@ func (c *Client) LogBatch(runID string, metrics []Metric, params []Param, tags [
 	return err
 }
 
+// LogModel logs a model to a run
+func (c *Client) LogModel(req LogModelRequest) error {
+	endpoint := "/api/2.0/mlflow/runs/log-model"
+	_, err := c.doRequest("POST", endpoint, req)
+	return err
+}
+
+// LogInputs logs inputs (datasets and/or model inputs) to a run
+func (c *Client) LogInputs(req LogInputsRequest) error {
+	endpoint := "/api/2.0/mlflow/runs/log-inputs"
+	_, err := c.doRequest("POST", endpoint, req)
+	return err
+}
+
+// GetMetricHistory gets the history of a metric for a run
+func (c *Client) GetMetricHistory(req GetMetricHistoryRequest) (*GetMetricHistoryResponse, error) {
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/metrics/get-history?run_uuid=%s&metric_key=%s",
+		url.QueryEscape(req.RunUUID), url.QueryEscape(req.MetricKey))
+	if req.MaxResults > 0 || req.PageToken != "" {
+		params := url.Values{}
+		if req.MaxResults > 0 {
+			params.Add("max_results", fmt.Sprintf("%d", req.MaxResults))
+		}
+		if req.PageToken != "" {
+			params.Add("page_token", req.PageToken)
+		}
+		endpoint += "&" + params.Encode()
+	}
+
+	respBody, err := c.doRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response GetMetricHistoryResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// ListArtifacts lists artifacts for a run
+func (c *Client) ListArtifacts(runID, path string, pageToken string) (*ListArtifactsResponse, error) {
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/artifacts/list?run_id=%s", url.QueryEscape(runID))
+	if path != "" {
+		endpoint += "&path=" + url.QueryEscape(path)
+	}
+	if pageToken != "" {
+		endpoint += "&page_token=" + url.QueryEscape(pageToken)
+	}
+
+	respBody, err := c.doRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response ListArtifactsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
 // Models API
 
 // CreateRegisteredModel creates a new registered model
@@ -434,7 +536,7 @@ func (c *Client) CreateModelVersion(req CreateModelVersionRequest) (*CreateModel
 
 // GetModelVersion gets a model version
 func (c *Client) GetModelVersion(name, version string) (*GetModelVersionResponse, error) {
-	endpoint := fmt.Sprintf("/api/2.0/mlflow/model-versions/get?name=%s&version=%s", 
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/model-versions/get?name=%s&version=%s",
 		url.QueryEscape(name), url.QueryEscape(version))
 	respBody, err := c.doRequest("GET", endpoint, nil)
 	if err != nil {
@@ -518,6 +620,176 @@ func (c *Client) TransitionModelVersionStage(name, version, stage, archiveExisti
 	}
 
 	var response GetModelVersionResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// RenameRegisteredModel renames a registered model
+func (c *Client) RenameRegisteredModel(req RenameRegisteredModelRequest) (*RenameRegisteredModelResponse, error) {
+	endpoint := "/api/2.0/mlflow/registered-models/rename"
+	respBody, err := c.doRequest("POST", endpoint, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var response RenameRegisteredModelResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// GetLatestModelVersions gets the latest model versions for a registered model
+func (c *Client) GetLatestModelVersions(req GetLatestModelVersionsRequest) (*GetLatestModelVersionsResponse, error) {
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/get-latest-versions?name=%s", url.QueryEscape(req.Name))
+	if len(req.Stages) > 0 {
+		params := url.Values{}
+		for _, stage := range req.Stages {
+			params.Add("stages", stage)
+		}
+		endpoint += "&" + params.Encode()
+	}
+
+	respBody, err := c.doRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response GetLatestModelVersionsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// SearchModelVersions searches for model versions
+func (c *Client) SearchModelVersions(req SearchModelVersionsRequest) (*SearchModelVersionsResponse, error) {
+	endpoint := "/api/2.0/mlflow/model-versions/search"
+	// Build query parameters for GET request
+	params := url.Values{}
+	if req.Filter != "" {
+		params.Add("filter", req.Filter)
+	}
+	if req.MaxResults > 0 {
+		params.Add("max_results", fmt.Sprintf("%d", req.MaxResults))
+	}
+	if len(req.OrderBy) > 0 {
+		for _, order := range req.OrderBy {
+			params.Add("order_by", order)
+		}
+	}
+	if req.PageToken != "" {
+		params.Add("page_token", req.PageToken)
+	}
+	if len(params) > 0 {
+		endpoint += "?" + params.Encode()
+	}
+
+	respBody, err := c.doRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response SearchModelVersionsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// GetDownloadURIs gets download URIs for model version artifacts
+func (c *Client) GetDownloadURIs(req GetDownloadURIsRequest) (*GetDownloadURIsResponse, error) {
+	endpoint := "/api/2.0/mlflow/model-versions/get-download-uris"
+	respBody, err := c.doRequest("POST", endpoint, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var response GetDownloadURIsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// SearchRegisteredModels searches for registered models
+func (c *Client) SearchRegisteredModels(req SearchRegisteredModelsRequest) (*SearchRegisteredModelsResponse, error) {
+	endpoint := "/api/2.0/mlflow/registered-models/search"
+	respBody, err := c.doRequest("POST", endpoint, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var response SearchRegisteredModelsResponse
+	if err := json.Unmarshal(respBody, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// SetRegisteredModelTag sets a tag on a registered model
+func (c *Client) SetRegisteredModelTag(req SetRegisteredModelTagRequest) error {
+	endpoint := "/api/2.0/mlflow/registered-models/set-tag"
+	_, err := c.doRequest("POST", endpoint, req)
+	return err
+}
+
+// SetModelVersionTag sets a tag on a model version
+func (c *Client) SetModelVersionTag(req SetModelVersionTagRequest) error {
+	endpoint := "/api/2.0/mlflow/model-versions/set-tag"
+	_, err := c.doRequest("POST", endpoint, req)
+	return err
+}
+
+// DeleteRegisteredModelTag deletes a tag from a registered model
+func (c *Client) DeleteRegisteredModelTag(req DeleteRegisteredModelTagRequest) error {
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/delete-tag?name=%s&key=%s",
+		url.QueryEscape(req.Name), url.QueryEscape(req.Key))
+	_, err := c.doRequest("DELETE", endpoint, nil)
+	return err
+}
+
+// DeleteModelVersionTag deletes a tag from a model version
+func (c *Client) DeleteModelVersionTag(req DeleteModelVersionTagRequest) error {
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/model-versions/delete-tag?name=%s&version=%s&key=%s",
+		url.QueryEscape(req.Name), url.QueryEscape(req.Version), url.QueryEscape(req.Key))
+	_, err := c.doRequest("DELETE", endpoint, nil)
+	return err
+}
+
+// SetRegisteredModelAlias sets an alias for a registered model
+func (c *Client) SetRegisteredModelAlias(req SetRegisteredModelAliasRequest) error {
+	endpoint := "/api/2.0/mlflow/registered-models/alias"
+	_, err := c.doRequest("POST", endpoint, req)
+	return err
+}
+
+// DeleteRegisteredModelAlias deletes an alias from a registered model
+func (c *Client) DeleteRegisteredModelAlias(req DeleteRegisteredModelAliasRequest) error {
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/alias?name=%s&alias=%s",
+		url.QueryEscape(req.Name), url.QueryEscape(req.Alias))
+	_, err := c.doRequest("DELETE", endpoint, nil)
+	return err
+}
+
+// GetModelVersionByAlias gets a model version by alias
+func (c *Client) GetModelVersionByAlias(req GetModelVersionByAliasRequest) (*GetModelVersionByAliasResponse, error) {
+	endpoint := fmt.Sprintf("/api/2.0/mlflow/registered-models/get-model-version-by-alias?name=%s&alias=%s",
+		url.QueryEscape(req.Name), url.QueryEscape(req.Alias))
+	respBody, err := c.doRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response GetModelVersionByAliasResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}

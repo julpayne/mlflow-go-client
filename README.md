@@ -83,6 +83,27 @@ for _, exp := range experiments.Experiments {
 }
 ```
 
+#### Search Experiments
+
+```go
+// Search experiments with filters
+searchReq := mlflow.SearchExperimentsRequest{
+    ViewType:   "ACTIVE_ONLY", // ACTIVE_ONLY, DELETED_ONLY, or ALL
+    MaxResults: 100,
+    Filter:     "name LIKE '%test%'",
+    OrderBy:    []string{"name ASC"},
+}
+
+results, err := client.SearchExperiments(searchReq)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, exp := range results.Experiments {
+    fmt.Printf("Experiment: %s\n", exp.Name)
+}
+```
+
 #### Update and Delete Experiments
 
 ```go
@@ -91,6 +112,9 @@ err := client.UpdateExperiment("experiment-id", "new-name")
 
 // Set experiment tag
 err := client.SetExperimentTag("experiment-id", "key", "value")
+
+// Delete experiment tag
+err := client.DeleteExperimentTag("experiment-id", "key")
 
 // Delete experiment
 err := client.DeleteExperiment("experiment-id")
@@ -197,6 +221,57 @@ for _, run := range results.Runs {
 }
 ```
 
+#### Log Model and Inputs
+
+```go
+// Log a model to a run
+err := client.LogModel(mlflow.LogModelRequest{
+    RunID:    runID,
+    ModelJSON: `{"model": "sklearn", "version": "1.0"}`,
+})
+
+// Log inputs (datasets and model inputs)
+err := client.LogInputs(mlflow.LogInputsRequest{
+    RunID: runID,
+    Datasets: []mlflow.Dataset{
+        {
+            Name:       "training_data",
+            Digest:     "abc123",
+            SourceType: "LOCAL",
+            Source:     "/path/to/data",
+        },
+    },
+})
+```
+
+#### Get Metric History and List Artifacts
+
+```go
+// Get metric history for a run
+history, err := client.GetMetricHistory(mlflow.GetMetricHistoryRequest{
+    RunUUID:   runID,
+    MetricKey: "accuracy",
+    MaxResults: 100,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, metric := range history.Metrics {
+    fmt.Printf("Step %d: %f\n", metric.Step, metric.Value)
+}
+
+// List artifacts for a run
+artifacts, err := client.ListArtifacts(runID, "", "")
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, file := range artifacts.Files {
+    fmt.Printf("Artifact: %s (size: %d)\n", file.Path, file.FileSize)
+}
+```
+
 #### Update and End a Run
 
 ```go
@@ -269,9 +344,48 @@ version, err := client.GetModelVersion("my-model", "1")
 versions, err := client.ListModelVersions("my-model", 100, "")
 ```
 
+#### Search Models and Versions
+
+```go
+// Search registered models
+searchReq := mlflow.SearchRegisteredModelsRequest{
+    Filter:     "name LIKE '%classifier%'",
+    MaxResults: 50,
+    OrderBy:    []string{"name ASC"},
+}
+
+models, err := client.SearchRegisteredModels(searchReq)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Search model versions
+versionSearchReq := mlflow.SearchModelVersionsRequest{
+    Filter:     "name='my-model' AND version='1'",
+    MaxResults: 100,
+}
+
+versions, err := client.SearchModelVersions(versionSearchReq)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
 #### Update and Transition Model Versions
 
 ```go
+// Rename registered model
+renamed, err := client.RenameRegisteredModel(mlflow.RenameRegisteredModelRequest{
+    Name:    "old-name",
+    NewName: "new-name",
+})
+
+// Get latest model versions
+latest, err := client.GetLatestModelVersions(mlflow.GetLatestModelVersionsRequest{
+    Name:   "my-model",
+    Stages: []string{"Production", "Staging"},
+})
+
 // Update model version
 err := client.UpdateModelVersion("my-model", "1", "Updated description", "Production")
 
@@ -282,6 +396,63 @@ version, err := client.TransitionModelVersionStage(
     "Production",
     "true", // archive existing versions
 )
+
+// Get download URIs for model artifacts
+uris, err := client.GetDownloadURIs(mlflow.GetDownloadURIsRequest{
+    Name:    "my-model",
+    Version: "1",
+    Paths:   []string{"model.pkl", "requirements.txt"},
+})
+```
+
+#### Model Tags and Aliases
+
+```go
+// Set registered model tag
+err := client.SetRegisteredModelTag(mlflow.SetRegisteredModelTagRequest{
+    Name:  "my-model",
+    Key:   "team",
+    Value: "ml-team",
+})
+
+// Set model version tag
+err := client.SetModelVersionTag(mlflow.SetModelVersionTagRequest{
+    Name:    "my-model",
+    Version: "1",
+    Key:     "deployed",
+    Value:   "true",
+})
+
+// Delete tags
+err := client.DeleteRegisteredModelTag(mlflow.DeleteRegisteredModelTagRequest{
+    Name: "my-model",
+    Key:  "team",
+})
+
+err := client.DeleteModelVersionTag(mlflow.DeleteModelVersionTagRequest{
+    Name:    "my-model",
+    Version: "1",
+    Key:     "deployed",
+})
+
+// Set model alias
+err := client.SetRegisteredModelAlias(mlflow.SetRegisteredModelAliasRequest{
+    Name:    "my-model",
+    Alias:   "production",
+    Version: "1",
+})
+
+// Get model version by alias
+version, err := client.GetModelVersionByAlias(mlflow.GetModelVersionByAliasRequest{
+    Name:  "my-model",
+    Alias: "production",
+})
+
+// Delete alias
+err := client.DeleteRegisteredModelAlias(mlflow.DeleteRegisteredModelAliasRequest{
+    Name:  "my-model",
+    Alias: "production",
+})
 
 // Delete model version
 err := client.DeleteModelVersion("my-model", "1")
@@ -296,12 +467,15 @@ This client supports the following MLflow API endpoints:
 
 ### Experiments
 - ✅ Create experiment
-- ✅ Get experiment (by ID or name)
+- ✅ Get experiment (by ID)
+- ✅ Get experiment (by name)
 - ✅ List experiments
+- ✅ Search experiments
 - ✅ Update experiment
 - ✅ Delete experiment
 - ✅ Restore experiment
 - ✅ Set experiment tag
+- ✅ Delete experiment tag
 
 ### Runs
 - ✅ Create run
@@ -315,32 +489,63 @@ This client supports the following MLflow API endpoints:
 - ✅ Set tag
 - ✅ Delete tag
 - ✅ Log batch (multiple metrics/params/tags)
+- ✅ Log model
+- ✅ Log inputs (datasets and model inputs)
+- ✅ Get metric history
+- ✅ List artifacts
 
 ### Models
 - ✅ Create registered model
 - ✅ Get registered model
 - ✅ List registered models
+- ✅ Search registered models
 - ✅ Update registered model
+- ✅ Rename registered model
 - ✅ Delete registered model
 - ✅ Create model version
 - ✅ Get model version
 - ✅ List model versions
+- ✅ Search model versions
+- ✅ Get latest model versions
 - ✅ Update model version
 - ✅ Delete model version
 - ✅ Transition model version stage
+- ✅ Get download URIs for model version artifacts
+- ✅ Set registered model tag
+- ✅ Set model version tag
+- ✅ Delete registered model tag
+- ✅ Delete model version tag
+- ✅ Set registered model alias
+- ✅ Delete registered model alias
+- ✅ Get model version by alias
 
 ## Error Handling
 
-All methods return errors that can be checked:
+All methods return errors that can be checked. The client uses a custom `APIError` type that provides detailed information about API errors:
 
 ```go
 experiment, err := client.GetExperiment("id")
 if err != nil {
-    // Handle error
-    fmt.Printf("Error: %v\n", err)
+    // Check if it's an APIError to access detailed information
+    if apiErr, ok := mlflow.IsAPIError(err); ok {
+        fmt.Printf("Status Code: %d\n", apiErr.GetStatusCode())
+        fmt.Printf("Error Code: %s\n", apiErr.GetErrorCode())
+        fmt.Printf("Message: %s\n", apiErr.GetMessage())
+        fmt.Printf("Response Body: %s\n", apiErr.GetResponseBodyString())
+    } else {
+        // Handle other types of errors (network, etc.)
+        fmt.Printf("Error: %v\n", err)
+    }
     return
 }
 ```
+
+The `APIError` type provides the following methods:
+- `GetStatusCode()` - Returns the HTTP status code
+- `GetErrorCode()` - Returns the MLflow error code (if available)
+- `GetMessage()` - Returns the error message
+- `GetResponseBody()` - Returns the raw response body as bytes
+- `GetResponseBodyString()` - Returns the response body as a string
 
 ## Authentication
 
@@ -349,6 +554,76 @@ The client supports Bearer token authentication:
 ```go
 client.SetAuthToken("your-api-token")
 ```
+
+## Running MLflow Server Locally
+
+This repository includes scripts and Makefile targets to easily download and run the MLflow server locally for testing and development.
+
+### Quick Start with Makefile
+
+1. **Install MLflow:**
+   ```bash
+   make install-mlflow
+   ```
+
+2. **Start the server:**
+   ```bash
+   make run-mlflow
+   ```
+
+3. **Use with the Go client:**
+   ```go
+   client := mlflow.NewClient("http://localhost:5000")
+   ```
+
+The server will be available at `http://localhost:5000` by default.
+
+### Custom Configuration with Makefile
+
+You can customize the server settings using environment variables:
+
+```bash
+# Custom host and port
+MLFLOW_PORT=8080 make run-mlflow
+
+# Use PostgreSQL backend
+MLFLOW_BACKEND_STORE_URI=postgresql://user:password@localhost/mlflow \
+make run-mlflow
+
+# Stop the server
+make stop-mlflow
+```
+
+### Using Scripts Directly
+
+Alternatively, you can use the scripts directly:
+
+```bash
+# Install MLflow
+./scripts/download_mlflow.sh
+
+# Start the server
+./scripts/run_mlflow.sh
+
+# With custom configuration
+MLFLOW_HOST=0.0.0.0 MLFLOW_PORT=8080 ./scripts/run_mlflow.sh
+```
+
+### Available Makefile Targets
+
+- `make install-mlflow` - Download and install MLflow server
+- `make run-mlflow` - Run MLflow server locally
+- `make stop-mlflow` - Stop MLflow server (if running)
+- `make build` - Build the Go client library
+- `make test` - Run tests
+- `make fmt` - Format Go code
+- `make vet` - Run go vet
+- `make lint` - Run golangci-lint (if installed)
+- `make example` - Build and run the example
+- `make clean` - Clean build artifacts
+- `make help` - Show all available targets
+
+For more details, see [scripts/README.md](scripts/README.md).
 
 ## License
 
