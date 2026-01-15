@@ -19,6 +19,12 @@ repos:
   # Local checks
   - repo: local
     hooks:
+      - id: go-fmt
+        name: go fmt
+        entry: go fmt ./...
+        language: system
+        types: [go]
+        pass_filenames: false
       - id: clean-and-build
         name: clean and build
         entry: make
