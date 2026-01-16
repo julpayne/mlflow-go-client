@@ -300,8 +300,9 @@ func (tc *testContext) getMetricHistory(metricKey string) error {
 		return fmt.Errorf("no run ID set")
 	}
 	req := mlflow.GetMetricHistoryRequest{
-		RunID:     tc.runID,
-		MetricKey: metricKey,
+		RunID:      tc.runID,
+		MetricKey:  metricKey,
+		MaxResults: 200,
 	}
 	resp, err := tc.client.GetMetricHistory(req)
 	if err != nil {

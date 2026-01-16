@@ -74,7 +74,7 @@ fmt.Printf("Experiment: %s\n", experiment.Experiment.Name)
 
 ```go
 searchReq := mlflow.SearchExperimentsRequest{
-    MaxResults: 100,
+    MaxResults: 200,
 }
 experiments, err := client.SearchExperiments(searchReq)
 if err != nil {
@@ -92,7 +92,7 @@ for _, exp := range experiments.Experiments {
 // Search experiments with filters
 searchReq := mlflow.SearchExperimentsRequest{
     ViewType:   "ACTIVE_ONLY", // ACTIVE_ONLY, DELETED_ONLY, or ALL
-    MaxResults: 100,
+    MaxResults: 200,
     Filter:     "name LIKE '%test%'",
     OrderBy:    []string{"name ASC"},
 }
@@ -254,7 +254,7 @@ err := client.LogInputs(mlflow.LogInputsRequest{
 history, err := client.GetMetricHistory(mlflow.GetMetricHistoryRequest{
     RunUUID:   runID,
     MetricKey: "accuracy",
-    MaxResults: 100,
+    MaxResults: 200,
 })
 if err != nil {
     log.Fatal(err)
@@ -365,7 +365,7 @@ if err != nil {
 // Search model versions
 versionSearchReq := mlflow.SearchModelVersionsRequest{
     Filter:     "name='my-model' AND version='1'",
-    MaxResults: 100,
+    MaxResults: 200,
 }
 
 versions, err := client.SearchModelVersions(versionSearchReq)

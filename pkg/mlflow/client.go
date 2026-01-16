@@ -218,18 +218,6 @@ func endpointMetricsGetHistory(runID, metricKey string, maxResults int, pageToke
 	return endpoint
 }
 
-// endpointArtifactsList returns the endpoint for listing artifacts with query parameters
-func endpointArtifactsList(runID, path, pageToken string) string {
-	endpoint := fmt.Sprintf("%s?run_id=%s", endpointArtifactsListBase, url.QueryEscape(runID))
-	if path != "" {
-		endpoint += "&path=" + url.QueryEscape(path)
-	}
-	if pageToken != "" {
-		endpoint += "&page_token=" + url.QueryEscape(pageToken)
-	}
-	return endpoint
-}
-
 // endpointRegisteredModelsGetLatestVersionsWithParams returns the endpoint for getting latest model versions with query parameters
 func endpointRegisteredModelsGetLatestVersionsWithParams(name string, stages []string) string {
 	endpoint := fmt.Sprintf("%s?name=%s", endpointRegisteredModelsGetLatestVersions, url.QueryEscape(name))
@@ -516,7 +504,12 @@ func (c *Client) GetMetricHistory(req GetMetricHistoryRequest) (*GetMetricHistor
 
 // ListArtifacts lists artifacts for a run
 func (c *Client) ListArtifacts(runID, path string, pageToken string) (*ListArtifactsResponse, error) {
-	respBody, err := c.doRequest(http.MethodGet, endpointArtifactsList(runID, path, pageToken), nil)
+	req := ListArtifactsRequest{
+		RunID:     runID,
+		Path:      path,
+		PageToken: pageToken,
+	}
+	respBody, err := c.doRequest(http.MethodGet, endpointArtifactsListBase, req)
 	if err != nil {
 		return nil, err
 	}

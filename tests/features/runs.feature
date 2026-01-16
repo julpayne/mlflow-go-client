@@ -63,7 +63,6 @@ Feature: MLflow Runs API
     Given a run exists in the experiment
     And I have logged metric "loss" multiple times to the run
     When I get the metric history for "loss"
-    Then fix this step
     Then I should get multiple metric values
 
   Scenario: List artifacts

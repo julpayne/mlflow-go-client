@@ -386,6 +386,13 @@ type FileInfo struct {
 	FileSize int64  `json:"file_size,omitempty"`
 }
 
+// ListArtifactsRequest represents a request to list artifacts
+type ListArtifactsRequest struct {
+	RunID     string `json:"run_id"`
+	Path      string `json:"path,omitempty"`
+	PageToken string `json:"page_token,omitempty"`
+}
+
 // ListArtifactsResponse represents the response from listing artifacts
 type ListArtifactsResponse struct {
 	RootURI       string     `json:"root_uri"`

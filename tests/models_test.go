@@ -93,7 +93,7 @@ func (tc *testContext) multipleRegisteredModelsExist() error {
 func (tc *testContext) searchRegisteredModels(filter string) error {
 	req := mlflow.SearchRegisteredModelsRequest{
 		Filter:     filter,
-		MaxResults: 100,
+		MaxResults: 200,
 	}
 	resp, err := tc.client.SearchRegisteredModels(req)
 	if err != nil {

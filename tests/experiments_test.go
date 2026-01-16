@@ -100,7 +100,7 @@ func (tc *testContext) multipleExperimentsExist() error {
 
 func (tc *testContext) listExperiments() error {
 	req := mlflow.SearchExperimentsRequest{
-		MaxResults: 100,
+		MaxResults: 200,
 	}
 	resp, err := tc.client.SearchExperiments(req)
 	if err != nil {
@@ -135,7 +135,7 @@ func (tc *testContext) listContainsExperiments(count int) error {
 
 func (tc *testContext) searchExperiments(filter string) error {
 	req := mlflow.SearchExperimentsRequest{
-		MaxResults: 100,
+		MaxResults: 200,
 		Filter:     filter,
 	}
 	resp, err := tc.client.SearchExperiments(req)
