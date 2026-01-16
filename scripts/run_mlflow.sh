@@ -56,12 +56,14 @@ echo -e "${BLUE}📍 Server will be available at: http://$HOST:$PORT${NC}"
 echo -e "${YELLOW}💡 Press Ctrl+C to stop the server${NC}"
 echo ""
 
+mkdir -p bin
+
 # Start MLflow server in background
 mlflow server \
     --host "$HOST" \
     --port "$PORT" \
     --backend-store-uri "$BACKEND_URI" \
-    --default-artifact-root "$DEFAULT_ARTIFACT_ROOT" &
+    --default-artifact-root "$DEFAULT_ARTIFACT_ROOT" | tee bin/mlflow.log &
 
 MLFLOW_PID=$!
 

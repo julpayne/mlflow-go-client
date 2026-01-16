@@ -19,9 +19,10 @@ repos:
   # Local checks
   - repo: local
     hooks:
-      - id: go-fmt
-        name: go fmt
-        entry: go fmt ./...
+      - id: checks
+        name: checks
+        entry: make
+        args: [fmt, lint]
         language: system
         types: [go]
         pass_filenames: false

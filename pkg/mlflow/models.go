@@ -306,18 +306,6 @@ type GetModelVersionResponse struct {
 	ModelVersion ModelVersion `json:"model_version"`
 }
 
-// ListRegisteredModelsResponse represents the response from listing registered models
-type ListRegisteredModelsResponse struct {
-	RegisteredModels []RegisteredModel `json:"registered_models"`
-	NextPageToken    string            `json:"next_page_token,omitempty"`
-}
-
-// ListModelVersionsResponse represents the response from listing model versions
-type ListModelVersionsResponse struct {
-	ModelVersions []ModelVersion `json:"model_versions"`
-	NextPageToken string         `json:"next_page_token,omitempty"`
-}
-
 // ErrorResponse represents an error response from the MLflow API
 type ErrorResponse struct {
 	ErrorCode string `json:"error_code"`
@@ -553,8 +541,9 @@ type SetRegisteredModelAliasRequest struct {
 
 // DeleteRegisteredModelAliasRequest represents a request to delete a registered model alias
 type DeleteRegisteredModelAliasRequest struct {
-	Name  string `json:"name"`
-	Alias string `json:"alias"`
+	Name    string `json:"name"`
+	Alias   string `json:"alias"`
+	Version string `json:"version"`
 }
 
 // GetModelVersionByAliasRequest represents a request to get model version by alias

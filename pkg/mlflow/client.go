@@ -176,23 +176,20 @@ const (
 	endpointArtifactsListBase = apiBasePath + "/artifacts/list"
 
 	// Registered Models endpoints
-	endpointRegisteredModelsCreate                     = registeredModelsBaseURL + "/create"
-	endpointRegisteredModelsGet                        = registeredModelsBaseURL + "/get"
-	endpointRegisteredModelsList                       = registeredModelsBaseURL + "/list"
-	endpointRegisteredModelsUpdate                     = registeredModelsBaseURL + "/update"
-	endpointRegisteredModelsDelete                     = registeredModelsBaseURL + "/delete"
-	endpointRegisteredModelsRename                     = registeredModelsBaseURL + "/rename"
-	endpointRegisteredModelsGetLatestVersions          = registeredModelsBaseURL + "/get-latest-versions"
-	endpointRegisteredModelsSearch                     = registeredModelsBaseURL + "/search"
-	endpointRegisteredModelsSetTag                     = registeredModelsBaseURL + "/set-tag"
-	endpointRegisteredModelsDeleteTagBase              = registeredModelsBaseURL + "/delete-tag"
-	endpointRegisteredModelsAliasBase                  = registeredModelsBaseURL + "/alias"
-	endpointRegisteredModelsGetModelVersionByAliasBase = registeredModelsBaseURL + "/get-model-version-by-alias"
+	endpointRegisteredModelsCreate            = registeredModelsBaseURL + "/create"
+	endpointRegisteredModelsGet               = registeredModelsBaseURL + "/get"
+	endpointRegisteredModelsUpdate            = registeredModelsBaseURL + "/update"
+	endpointRegisteredModelsDelete            = registeredModelsBaseURL + "/delete"
+	endpointRegisteredModelsRename            = registeredModelsBaseURL + "/rename"
+	endpointRegisteredModelsGetLatestVersions = registeredModelsBaseURL + "/get-latest-versions"
+	endpointRegisteredModelsSearch            = registeredModelsBaseURL + "/search"
+	endpointRegisteredModelsSetTag            = registeredModelsBaseURL + "/set-tag"
+	endpointRegisteredModelsDeleteTagBase     = registeredModelsBaseURL + "/delete-tag"
+	endpointRegisteredModelsAliasBase         = registeredModelsBaseURL + "/alias"
 
 	// Model Versions endpoints
 	endpointModelVersionsCreate          = modelVersionsBaseURL + "/create"
 	endpointModelVersionsGetBase         = modelVersionsBaseURL + "/get"
-	endpointModelVersionsList            = modelVersionsBaseURL + "/list"
 	endpointModelVersionsUpdate          = modelVersionsBaseURL + "/update"
 	endpointModelVersionsDeleteBase      = modelVersionsBaseURL + "/delete"
 	endpointModelVersionsTransitionStage = modelVersionsBaseURL + "/transition-stage"
@@ -229,38 +226,6 @@ func endpointArtifactsList(runID, path, pageToken string) string {
 	}
 	if pageToken != "" {
 		endpoint += "&page_token=" + url.QueryEscape(pageToken)
-	}
-	return endpoint
-}
-
-// endpointRegisteredModelsListWithParams returns the endpoint for listing registered models with query parameters
-func endpointRegisteredModelsListWithParams(maxResults int, pageToken string) string {
-	endpoint := endpointRegisteredModelsList
-	if maxResults > 0 || pageToken != "" {
-		params := url.Values{}
-		if maxResults > 0 {
-			params.Add("max_results", fmt.Sprintf("%d", maxResults))
-		}
-		if pageToken != "" {
-			params.Add("page_token", pageToken)
-		}
-		endpoint += "?" + params.Encode()
-	}
-	return endpoint
-}
-
-// endpointModelVersionsListWithParams returns the endpoint for listing model versions with query parameters
-func endpointModelVersionsListWithParams(name string, maxResults int, pageToken string) string {
-	endpoint := fmt.Sprintf("%s?name=%s", endpointModelVersionsList, url.QueryEscape(name))
-	if maxResults > 0 || pageToken != "" {
-		params := url.Values{}
-		if maxResults > 0 {
-			params.Add("max_results", fmt.Sprintf("%d", maxResults))
-		}
-		if pageToken != "" {
-			params.Add("page_token", pageToken)
-		}
-		endpoint += "&" + params.Encode()
 	}
 	return endpoint
 }
@@ -391,8 +356,12 @@ func (c *Client) DeleteExperimentTag(experimentID, key string) error {
 
 // SearchExperiments searches for experiments
 func (c *Client) SearchExperiments(req SearchExperimentsRequest) (*SearchExperimentsResponse, error) {
-	if req.MaxResults <= 0 {
+	if req.MaxResults < 0 {
 		return nil, fmt.Errorf("max_results must be greater than zero when provided")
+	}
+	if req.MaxResults == 0 {
+		// put in a reasonable default value
+		req.MaxResults = 100
 	}
 	respBody, err := c.doRequest(http.MethodPost, endpointExperimentsSearch, req)
 	if err != nil {
@@ -433,8 +402,12 @@ func (c *Client) GetRun(runID string) (*GetRunResponse, error) {
 
 // SearchRuns searches for runs
 func (c *Client) SearchRuns(req SearchRunsRequest) (*SearchRunsResponse, error) {
-	if req.MaxResults <= 0 {
+	if req.MaxResults < 0 {
 		return nil, fmt.Errorf("max_results must be greater than zero when provided")
+	}
+	if req.MaxResults == 0 {
+		// put in a reasonable default value
+		req.MaxResults = 100
 	}
 	respBody, err := c.doRequest(http.MethodPost, endpointRunsSearch, req)
 	if err != nil {
@@ -568,22 +541,12 @@ func (c *Client) GetRegisteredModel(name string) (*GetRegisteredModelResponse, e
 	req := GetRegisteredModelRequest{
 		Name: name,
 	}
-	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsGet, req)
+	respBody, err := c.doRequest(http.MethodGet, endpointRegisteredModelsGet, req)
 	if err != nil {
 		return nil, err
 	}
 
 	return unmarshalResponse[GetRegisteredModelResponse](respBody)
-}
-
-// ListRegisteredModels lists all registered models
-func (c *Client) ListRegisteredModels(maxResults int, pageToken string) (*ListRegisteredModelsResponse, error) {
-	respBody, err := c.doRequest(http.MethodGet, endpointRegisteredModelsListWithParams(maxResults, pageToken), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return unmarshalResponse[ListRegisteredModelsResponse](respBody)
 }
 
 // UpdateRegisteredModel updates a registered model
@@ -600,10 +563,11 @@ func (c *Client) UpdateRegisteredModel(name, description string) error {
 
 // DeleteRegisteredModel deletes a registered model
 func (c *Client) DeleteRegisteredModel(name string) error {
-	req := map[string]string{
-		"name": name,
+	req := map[string]any{
+		"name":        name,
+		"max_results": 100,
 	}
-	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsDelete, req)
+	_, err := c.doRequest(http.MethodDelete, endpointRegisteredModelsDelete, req)
 	return err
 }
 
@@ -623,22 +587,12 @@ func (c *Client) GetModelVersion(name, version string) (*GetModelVersionResponse
 		Name:    name,
 		Version: version,
 	}
-	respBody, err := c.doRequest(http.MethodPost, endpointModelVersionsGetBase, req)
+	respBody, err := c.doRequest(http.MethodGet, endpointModelVersionsGetBase, req)
 	if err != nil {
 		return nil, err
 	}
 
 	return unmarshalResponse[GetModelVersionResponse](respBody)
-}
-
-// ListModelVersions lists model versions for a registered model
-func (c *Client) ListModelVersions(name string, maxResults int, pageToken string) (*ListModelVersionsResponse, error) {
-	respBody, err := c.doRequest(http.MethodGet, endpointModelVersionsListWithParams(name, maxResults, pageToken), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return unmarshalResponse[ListModelVersionsResponse](respBody)
 }
 
 // UpdateModelVersion updates a model version
@@ -663,7 +617,7 @@ func (c *Client) DeleteModelVersion(name, version string) error {
 		"name":    name,
 		"version": version,
 	}
-	_, err := c.doRequest(http.MethodPost, endpointModelVersionsDeleteBase, req)
+	_, err := c.doRequest(http.MethodDelete, endpointModelVersionsDeleteBase, req)
 	return err
 }
 
@@ -707,8 +661,12 @@ func (c *Client) GetLatestModelVersions(req GetLatestModelVersionsRequest) (*Get
 
 // SearchModelVersions searches for model versions
 func (c *Client) SearchModelVersions(req SearchModelVersionsRequest) (*SearchModelVersionsResponse, error) {
-	if req.MaxResults <= 0 {
+	if req.MaxResults < 0 {
 		return nil, fmt.Errorf("max_results must be greater than zero when provided")
+	}
+	if req.MaxResults == 0 {
+		// put in a reasonable default value
+		req.MaxResults = 100
 	}
 	respBody, err := c.doRequest(http.MethodGet, endpointModelVersionsSearchWithParams(req.Filter, req.MaxResults, req.OrderBy, req.PageToken), nil)
 	if err != nil {
@@ -730,10 +688,14 @@ func (c *Client) GetDownloadURIs(req GetDownloadURIsRequest) (*GetDownloadURIsRe
 
 // SearchRegisteredModels searches for registered models
 func (c *Client) SearchRegisteredModels(req SearchRegisteredModelsRequest) (*SearchRegisteredModelsResponse, error) {
-	if req.MaxResults <= 0 {
+	if req.MaxResults < 0 {
 		return nil, fmt.Errorf("max_results must be greater than zero when provided")
 	}
-	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsSearch, req)
+	if req.MaxResults == 0 {
+		// put in a reasonable default value
+		req.MaxResults = 100
+	}
+	respBody, err := c.doRequest(http.MethodGet, endpointRegisteredModelsSearch, req)
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +721,10 @@ func (c *Client) DeleteRegisteredModelTag(req DeleteRegisteredModelTagRequest) e
 		"name": req.Name,
 		"key":  req.Key,
 	}
-	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsDeleteTagBase, reqBody)
+	if len([]byte(req.Key)) > 250 {
+		return fmt.Errorf("key length must be less than 250 bytes")
+	}
+	_, err := c.doRequest(http.MethodDelete, endpointRegisteredModelsDeleteTagBase, reqBody)
 	return err
 }
 
@@ -770,7 +735,7 @@ func (c *Client) DeleteModelVersionTag(req DeleteModelVersionTagRequest) error {
 		"version": req.Version,
 		"key":     req.Key,
 	}
-	_, err := c.doRequest(http.MethodPost, endpointModelVersionsDeleteTagBase, reqBody)
+	_, err := c.doRequest(http.MethodDelete, endpointModelVersionsDeleteTagBase, reqBody)
 	return err
 }
 
@@ -782,9 +747,13 @@ func (c *Client) SetRegisteredModelAlias(req SetRegisteredModelAliasRequest) err
 
 // DeleteRegisteredModelAlias deletes an alias from a registered model
 func (c *Client) DeleteRegisteredModelAlias(req DeleteRegisteredModelAliasRequest) error {
+	if len([]byte(req.Alias)) > 256 {
+		return fmt.Errorf("alias length must not be more than 256 bytes")
+	}
 	reqBody := map[string]string{
-		"name":  req.Name,
-		"alias": req.Alias,
+		"name":    req.Name,
+		"alias":   req.Alias,
+		"version": req.Version,
 	}
 	_, err := c.doRequest(http.MethodPost, endpointRegisteredModelsAliasBase, reqBody)
 	return err
@@ -792,7 +761,10 @@ func (c *Client) DeleteRegisteredModelAlias(req DeleteRegisteredModelAliasReques
 
 // GetModelVersionByAlias gets a model version by alias
 func (c *Client) GetModelVersionByAlias(req GetModelVersionByAliasRequest) (*GetModelVersionByAliasResponse, error) {
-	respBody, err := c.doRequest(http.MethodPost, endpointRegisteredModelsGetModelVersionByAliasBase, req)
+	if len([]byte(req.Alias)) > 256 {
+		return nil, fmt.Errorf("alias length must not be more than 256 bytes")
+	}
+	respBody, err := c.doRequest(http.MethodGet, endpointRegisteredModelsAliasBase, req)
 	if err != nil {
 		return nil, err
 	}
