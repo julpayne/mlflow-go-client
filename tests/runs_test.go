@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/julpayne/mlflow-go-client/pkg/mlflow"
 )
 
@@ -15,7 +16,7 @@ func (tc *testContext) createRun() error {
 	}
 	req := mlflow.CreateRunRequest{
 		ExperimentID: tc.experimentID,
-		RunName:      fmt.Sprintf("test-run-%d", time.Now().Unix()),
+		RunName:      fmt.Sprintf("test-run-%s", uuid.New().String()),
 	}
 	resp, err := tc.client.CreateRun(req)
 	if err != nil {
@@ -169,9 +170,9 @@ func (tc *testContext) logBatch(metricCount, paramCount int) error {
 	metrics := make([]mlflow.Metric, metricCount)
 	for i := 0; i < metricCount; i++ {
 		metrics[i] = mlflow.Metric{
-			Key:       fmt.Sprintf("metric_%d", i),
-			Value:     float64(i) * 0.1,
-			Step:      int64(i),
+			Key:   fmt.Sprintf("metric_%d", i),
+			Value: float64(i) * 0.1,
+			//Step:      int64(i),
 			Timestamp: time.Now().UnixMilli(),
 		}
 	}
@@ -244,6 +245,18 @@ func (tc *testContext) multipleRunsExist() error {
 	return nil
 }
 
+func (tc *testContext) multipleRunsExistWithTag(tag, value string) error {
+	for i := 0; i < 3; i++ {
+		if err := tc.createRun(); err != nil {
+			return err
+		}
+		if err := tc.setRunTag(tag, value); err != nil {
+			return fmt.Errorf("failed to set tag %s=%s: %w", tag, value, err)
+		}
+	}
+	return nil
+}
+
 func (tc *testContext) searchRuns(filter string) error {
 	if tc.experimentID == "" {
 		return fmt.Errorf("no experiment ID set")
@@ -266,8 +279,8 @@ func (tc *testContext) getListOfRuns() error {
 	if !ok {
 		return fmt.Errorf("expected SearchRunsResponse")
 	}
-	if resp.Runs == nil {
-		return fmt.Errorf("runs list is nil")
+	if len(resp.Runs) == 0 {
+		return fmt.Errorf("runs list is empty")
 	}
 	return nil
 }
@@ -277,7 +290,7 @@ func (tc *testContext) loggedMetricMultipleTimes(metricKey string) error {
 		if err := tc.logMetric(metricKey, float64(i)*0.1); err != nil {
 			return err
 		}
-		time.Sleep(10 * time.Millisecond) // Small delay to ensure different timestamps
+		time.Sleep(100 * time.Millisecond) // Small delay to ensure different timestamps
 	}
 	return nil
 }
@@ -287,7 +300,7 @@ func (tc *testContext) getMetricHistory(metricKey string) error {
 		return fmt.Errorf("no run ID set")
 	}
 	req := mlflow.GetMetricHistoryRequest{
-		RunUUID:   tc.runID,
+		RunID:     tc.runID,
 		MetricKey: metricKey,
 	}
 	resp, err := tc.client.GetMetricHistory(req)
@@ -342,9 +355,12 @@ func (tc *testContext) deleteRun() error {
 }
 
 func (tc *testContext) runDeleted() error {
-	_, err := tc.client.GetRun(tc.runID)
+	run, err := tc.client.GetRun(tc.runID)
 	if err == nil {
-		return fmt.Errorf("run still exists")
+		if run.Run.Info.LifecycleStage != "deleted" {
+			return fmt.Errorf("run still exists, lifecycle stage: %s", run.Run.Info.LifecycleStage)
+		}
+		return nil
 	}
 	return nil
 }

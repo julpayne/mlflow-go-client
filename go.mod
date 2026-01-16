@@ -2,7 +2,10 @@ module github.com/julpayne/mlflow-go-client
 
 go 1.21
 
-require github.com/cucumber/godog v0.14.0
+require (
+	github.com/cucumber/godog v0.14.0
+	github.com/google/uuid v1.6.0
+)
 
 require (
 	github.com/cucumber/gherkin/go/v26 v26.2.0 // indirect

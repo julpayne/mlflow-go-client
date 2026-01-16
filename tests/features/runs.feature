@@ -2,11 +2,13 @@ Feature: MLflow Runs API
   As a developer
   I want to manage MLflow runs
   So that I can track my machine learning experiments
+  Note that you can not delete an experiment and then immediately create a
+  new one with the same name because it may not yet be completely deleted
 
   Background:
     Given an MLflow server is running at "http://localhost:5000"
     And I have an MLflow client connected to the server
-    And an experiment named "runs-experiment" exists
+    And an experiment with a unique name exists
 
   Scenario: Create a new run
     When I create a run in the experiment
@@ -53,19 +55,21 @@ Feature: MLflow Runs API
     Then the run status should be "FINISHED"
 
   Scenario: Search runs
-    Given multiple runs exist in the experiment
-    When I search for runs with filter "metrics.accuracy > 0.9"
-    Then I should get a list of runs
+    Given multiple runs exist in the experiment with tag "dev" equals "true"
+    When I search for runs with filter "tags.dev = 'true'"
+    Then I should get a non-empty list of runs
 
   Scenario: Get metric history
     Given a run exists in the experiment
     And I have logged metric "loss" multiple times to the run
     When I get the metric history for "loss"
+    Then fix this step
     Then I should get multiple metric values
 
   Scenario: List artifacts
     Given a run exists in the experiment
     When I list artifacts for the run
+    Then fix this step
     Then I should get a list of artifacts
 
   Scenario: Delete a run

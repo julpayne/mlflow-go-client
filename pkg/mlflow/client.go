@@ -202,9 +202,9 @@ const (
 // Endpoint helper functions for parameterized endpoints
 
 // endpointMetricsGetHistory returns the endpoint for getting metric history with query parameters
-func endpointMetricsGetHistory(runUUID, metricKey string, maxResults int, pageToken string) string {
-	endpoint := fmt.Sprintf("%s?run_uuid=%s&metric_key=%s",
-		endpointMetricsGetHistoryBase, url.QueryEscape(runUUID), url.QueryEscape(metricKey))
+func endpointMetricsGetHistory(runID, metricKey string, maxResults int, pageToken string) string {
+	endpoint := fmt.Sprintf("%s?run_id=%s&metric_key=%s",
+		endpointMetricsGetHistoryBase, url.QueryEscape(runID), url.QueryEscape(metricKey))
 	if maxResults > 0 || pageToken != "" {
 		params := url.Values{}
 		if maxResults > 0 {
@@ -392,7 +392,7 @@ func (c *Client) GetRun(runID string) (*GetRunResponse, error) {
 	req := GetRunRequest{
 		RunID: runID,
 	}
-	respBody, err := c.doRequest(http.MethodPost, endpointRunsGet, req)
+	respBody, err := c.doRequest(http.MethodGet, endpointRunsGet, req)
 	if err != nil {
 		return nil, err
 	}
@@ -482,11 +482,11 @@ func (c *Client) DeleteTag(runID, key string) error {
 
 // LogBatch logs multiple metrics, parameters, and tags in a single request
 func (c *Client) LogBatch(runID string, metrics []Metric, params []Param, tags []RunTag) error {
-	req := map[string]interface{}{
-		"run_id":  runID,
-		"metrics": metrics,
-		"params":  params,
-		"tags":    tags,
+	req := LogBatchRequest{
+		RunID:   runID,
+		Metrics: metrics,
+		Params:  params,
+		Tags:    tags,
 	}
 	_, err := c.doRequest(http.MethodPost, endpointRunsLogBatch, req)
 	return err
@@ -506,7 +506,7 @@ func (c *Client) LogInputs(req LogInputsRequest) error {
 
 // GetMetricHistory gets the history of a metric for a run
 func (c *Client) GetMetricHistory(req GetMetricHistoryRequest) (*GetMetricHistoryResponse, error) {
-	respBody, err := c.doRequest(http.MethodGet, endpointMetricsGetHistory(req.RunUUID, req.MetricKey, req.MaxResults, req.PageToken), nil)
+	respBody, err := c.doRequest(http.MethodGet, endpointMetricsGetHistory(req.RunID, req.MetricKey, req.MaxResults, req.PageToken), nil)
 	if err != nil {
 		return nil, err
 	}

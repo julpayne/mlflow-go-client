@@ -621,7 +621,6 @@ MLFLOW_HOST=0.0.0.0 MLFLOW_PORT=8080 ./scripts/run_mlflow.sh
 - `make fmt` - Format Go code
 - `make vet` - Run go vet
 - `make lint` - Run golangci-lint (if installed)
-- `make example` - Build and run the example
 - `make clean` - Clean build artifacts
 - `make help` - Show all available targets
 

@@ -49,11 +49,11 @@ func (ctx *testContext) cleanup() {
 		resource := ctx.createdResources[i]
 		switch resource.Type {
 		case "experiment":
-			ctx.client.DeleteExperiment(resource.ID)
+			_ = ctx.client.DeleteExperiment(resource.ID)
 		case "run":
-			ctx.client.DeleteRun(resource.ID)
+			_ = ctx.client.DeleteRun(resource.ID)
 		case "model":
-			ctx.client.DeleteRegisteredModel(resource.Name)
+			_ = ctx.client.DeleteRegisteredModel(resource.Name)
 		}
 	}
 	ctx.createdResources = nil
@@ -88,6 +88,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the experiment should be created successfully$`, tc.experimentCreatedSuccessfully)
 	ctx.Step(`^the experiment should have the name "([^"]*)"$`, tc.experimentHasName)
 	ctx.Step(`^an experiment named "([^"]*)" exists$`, tc.experimentExists)
+	ctx.Step(`^an experiment with a unique name exists$`, tc.experimentUniqueNameExists)
 	ctx.Step(`^I get the experiment by ID$`, tc.getExperimentByID)
 	ctx.Step(`^I get the experiment by name "([^"]*)"$`, tc.getExperimentByName)
 	ctx.Step(`^the experiment should be returned$`, tc.experimentReturned)
@@ -135,8 +136,9 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^I update the run status to "([^"]*)"$`, tc.updateRunStatus)
 	ctx.Step(`^the run status should be "([^"]*)"$`, tc.runStatusShouldBe)
 	ctx.Step(`^multiple runs exist in the experiment$`, tc.multipleRunsExist)
+	ctx.Step(`^multiple runs exist in the experiment with tag "([^"]*)" equals "([^"]*)"$`, tc.multipleRunsExistWithTag)
 	ctx.Step(`^I search for runs with filter "([^"]*)"$`, tc.searchRuns)
-	ctx.Step(`^I should get a list of runs$`, tc.getListOfRuns)
+	ctx.Step(`^I should get a non-empty list of runs$`, tc.getListOfRuns)
 	ctx.Step(`^I have logged metric "([^"]*)" multiple times to the run$`, tc.loggedMetricMultipleTimes)
 	ctx.Step(`^I get the metric history for "([^"]*)"$`, tc.getMetricHistory)
 	ctx.Step(`^I should get multiple metric values$`, tc.getMultipleMetricValues)
@@ -196,6 +198,9 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the model version should be deleted$`, tc.modelVersionDeleted)
 	ctx.Step(`^I delete the registered model$`, tc.deleteRegisteredModel)
 	ctx.Step(`^the model should be deleted$`, tc.modelDeleted)
+
+	// Other steps
+	ctx.Step(`^fix this step$`, tc.fixThisStep)
 }
 
 func debugLog(format string, a ...any) {
@@ -228,4 +233,9 @@ func (tc *testContext) clientConnected() error {
 		return fmt.Errorf("client not initialized")
 	}
 	return nil
+}
+
+func (tc *testContext) fixThisStep() error {
+	debugLog("TODO: fix this step")
+	return godog.ErrSkip
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/julpayne/mlflow-go-client/pkg/mlflow"
 )
 
@@ -43,7 +44,22 @@ func (tc *testContext) experimentHasName(name string) error {
 }
 
 func (tc *testContext) experimentExists(name string) error {
-	return tc.createExperiment(name)
+	resp, err := tc.client.GetExperimentByName(name)
+	if err != nil {
+		debugLog("Error whilst getting experiment by name %s: %s", name, err.Error())
+		return tc.createExperiment(name)
+	}
+	if resp.Experiment.LifecycleStage != "active" {
+		return fmt.Errorf("experiment %s is not active", name)
+	}
+	if resp.Experiment.Name != name {
+		return fmt.Errorf("expected experiment name %s, got %s", name, resp.Experiment.Name)
+	}
+	return nil
+}
+
+func (tc *testContext) experimentUniqueNameExists() error {
+	return tc.experimentExists(fmt.Sprintf("test-experiment-%s", uuid.New().String()))
 }
 
 func (tc *testContext) getExperimentByID() error {

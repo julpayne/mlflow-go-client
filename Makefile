@@ -3,6 +3,9 @@
 # Default target
 .DEFAULT_GOAL := help
 
+GOPATH := $(shell go env GOPATH)
+GOBIN := $(shell go env GOPATH)/bin
+
 # Variables
 MLFLOW_HOST ?= 127.0.0.1
 MLFLOW_PORT ?= 5000
@@ -137,19 +140,13 @@ vet:
 	@echo "🔍 Running go vet..."
 	@go vet ./...
 
-## lint: Run golangci-lint (if installed)
-lint:
-	@echo "🔍 Running linter..."
-	@if command -v golangci-lint > /dev/null; then \
-		golangci-lint run; \
-	else \
-		echo "⚠️  golangci-lint not installed. Install it with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
-	fi
+${GOBIN}/golangci-lint:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
-## example: Build and run the example
-example:
-	@echo "🏃 Running example..."
-	@go run example/main.go
+## lint: Run golangci-lint (if installed)
+lint: ${GOBIN}/golangci-lint
+	@echo "🔍 Running linter..."
+	${GOBIN}/golangci-lint run
 
 ## clean: Clean build artifacts
 clean:
@@ -157,7 +154,7 @@ clean:
 	@go clean ./...
 	@rm -f mlflow.db
 	@rm -rf mlruns
-	@rm -rf *.db
+	@rm -fr bin
 
 .PHONY: cls
 cls:

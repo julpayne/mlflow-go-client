@@ -42,7 +42,6 @@ type Run struct {
 // RunInfo contains metadata about a run
 type RunInfo struct {
 	RunID          string `json:"run_id"`
-	RunUUID        string `json:"run_uuid"`
 	RunName        string `json:"run_name,omitempty"`
 	ExperimentID   string `json:"experiment_id"`
 	UserID         string `json:"user_id,omitempty"`
@@ -396,7 +395,7 @@ type ListArtifactsResponse struct {
 
 // GetMetricHistoryRequest represents a request to get metric history
 type GetMetricHistoryRequest struct {
-	RunUUID    string `json:"run_uuid"`
+	RunID      string `json:"run_id"`
 	MetricKey  string `json:"metric_key"`
 	MaxResults int    `json:"max_results,omitempty"`
 	PageToken  string `json:"page_token,omitempty"`
@@ -406,6 +405,14 @@ type GetMetricHistoryRequest struct {
 type GetMetricHistoryResponse struct {
 	Metrics       []Metric `json:"metrics"`
 	NextPageToken string   `json:"next_page_token,omitempty"`
+}
+
+// LogBatchRequest represents a request to log a batch of metrics
+type LogBatchRequest struct {
+	RunID   string   `json:"run_id"`
+	Metrics []Metric `json:"metrics,omitempty"`
+	Params  []Param  `json:"params,omitempty"`
+	Tags    []RunTag `json:"tags,omitempty"`
 }
 
 // LogModelRequest represents a request to log a model
