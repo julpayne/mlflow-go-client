@@ -5,8 +5,11 @@
 
 set -e
 
-# REQUESTED_VERSION=${1:-"3.8.1"}
-REQUESTED_VERSION=${1:-""}
+# For now we default to uasing version 3.8.1, we would need to see
+# how we want to handle versions and to what extent the API is
+# stable across versions.
+REQUESTED_VERSION=${1:-"3.8.1"}
+# REQUESTED_VERSION=${1:-""}
 
 REQUESTED_PYTHON_MAJOR_VERSION=${2:-"3"}
 REQUESTED_PYTHON_MINOR_VERSION=${3:-"10"}
